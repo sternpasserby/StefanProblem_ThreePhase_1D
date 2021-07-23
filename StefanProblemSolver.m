@@ -76,33 +76,18 @@ for n = 1:M
     s3(n+1) = s3(n) + tau*ds3dt;
     
     % Получение распределения тепла для первой фазы
-    [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt);
-    C3 = alpha(1, 2) / (s1(n+1) - s0(n+1)) / (2*h);
-    A(1, 1) = alpha(1, 1) - 3*C3;
-    A(1, 2) = 4*C3;
-    A(1, 3) = -C3;
-    b(1) = g0(n*tau);
-    A(end, end) = 1;
-    b(end) = Uf;
+    [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
+        [alpha(1, :); 1 0], Uf, g0(n*tau));
     u1 = A \ b;
     
     % Получение распределения тепла для второй фазы
-    [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt);
-    A(1, 1) = 1;
-    b(1) = Uf;
-    A(end, end) = 1;
-    b(end) = Uf;
+    [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+        [1 0; 1 0], Uf, Uf);
     u2 = A \ b;
     
     % Получение распределения тепла для третьей фазы
-    [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt);
-    A(1, 1) = 1;
-    b(1) = Uf;
-    C4 = alpha(2, 2) / (s3(n+1) - s2(n+1))/(2*h);
-    A(end, end - 2) = C4;
-    A(end, end - 1) = -4*C4;
-    A(end, end) = 3*C4 + alpha(2, 1);
-    b(end) = g3(n*tau);
+    [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
+        [1 0; alpha(2, :)], g3(n*tau), Uf);
     u3 = A \ b;
     
     % Запись результатов
