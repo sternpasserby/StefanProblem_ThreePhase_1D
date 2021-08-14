@@ -49,6 +49,7 @@ ic.u3 = zeros(1, Np) + 273.15 + 10;
 
 [U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax);
 figure('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
+subplot(3, 1, [2 3])
 contourf(T, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5)
 hold on
 plot(t, s, '-w', 'LineWidth', 2)
@@ -61,3 +62,6 @@ hcb = colorbar;
 hcb.Title.String = "Temperature, C";
 %set(get(hcb,'Title'),'String','A Title')
 
+subplot(3, 1, 1)
+plot(t, bc.g3(t) - pc.Uf)
+ylabel("Temperature, C")
