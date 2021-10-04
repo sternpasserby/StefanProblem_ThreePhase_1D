@@ -52,6 +52,8 @@ saveTime = 0;
 saveStep = tMax/nCols;
 saveId = 0;
 
+htc = 119.7;
+
 tic;
 for n = 1:M
     u1_past = u1;
@@ -83,17 +85,17 @@ for n = 1:M
     
     % Получение распределения тепла для первой фазы
     [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
-        [alpha(1, :); 1 0], Uf, g0(n*tau));
+        [alpha(1, :); htc -lambda1], htc*Uf, g0(n*tau));
     u1 = A \ b;
     
     % Получение распределения тепла для второй фазы
     [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-        [1 0; 1 0], Uf, Uf);
+        [htc -lambda2; -htc -lambda2], -htc*Uf, htc*Uf);
     u2 = A \ b;
     
     % Получение распределения тепла для третьей фазы
     [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
-        [1 0; alpha(2, :)], g3(n*tau), Uf);
+        [-htc -lambda1; alpha(2, :)], g3(n*tau), -htc*Uf);
     u3 = A \ b;
     
     % Запись результатов

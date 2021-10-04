@@ -33,7 +33,7 @@ bc.g3 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимани�
 %%% Параметры численного решения
 Np = 100;            % Число узлов сетки для каждой фазы
 %h = 1/N;             % Шаг по координате
-tMax = 0.3*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tMax = 0.5*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24/24;     % Шаг по времени, с
 %M = floor(tMax/tau); % Число шагов по времени
 
@@ -50,18 +50,19 @@ ic.u3 = zeros(1, Np) + 273.15 + 10;
 [U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax);
 figure('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 subplot(3, 1, [2 3])
-contourf(T, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5)
+contourf(T/3600/24, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5)
+axis([-inf inf 0 1])
 hold on
-plot(t, s, '-w', 'LineWidth', 2)
+plot(t/3600/24, s, '-w', 'LineWidth', 2)
 hold off
-xlabel("t, seconds")
+xlabel("t, days")
 ylabel("X, meters")
 colormap(jet)
-%caxis([-1 1])
+caxis([-12 8])
 hcb = colorbar;
 hcb.Title.String = "Temperature, C";
 %set(get(hcb,'Title'),'String','A Title')
 
 subplot(3, 1, 1)
-plot(t, bc.g3(t) - pc.Uf)
+plot(t/3600/24, bc.g3(t) - pc.Uf)
 ylabel("Temperature, C")
