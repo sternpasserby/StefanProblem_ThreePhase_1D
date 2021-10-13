@@ -22,26 +22,38 @@ pc.Uf = 273.15;               % Температура фазового пере
 % alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
 % alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
 bc = struct;                  % bc - boundary conditions
-bc.alpha = zeros(2);
+bc.alpha = zeros(6, 2);
 bc.alpha(1, 1) = 0;
-bc.alpha(1, 2) = 1;%-pc.lambda1;
-bc.g0 = @(t)(-0.05);
+bc.alpha(1, 2) = -pc.lambda1;
+bc.g0 = @(t)(0.05);
 bc.alpha(2, 1) = 1;
 bc.alpha(2, 2) = 0;
-bc.g3 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
+bc.g1 = @(t)(pc.Uf);
+bc.alpha(3, 1) = 1;
+bc.alpha(3, 2) = 0;
+bc.g2 = @(t)(pc.Uf);
+bc.alpha(4, 1) = 1;
+bc.alpha(4, 2) = 0;
+bc.g3 = @(t)(pc.Uf);
+bc.alpha(5, 1) = 1;
+bc.alpha(5, 2) = 0;
+bc.g4 = @(t)(pc.Uf);
+bc.alpha(6, 1) = 1;
+bc.alpha(6, 2) = 0;
+bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
 
 %%% Параметры численного решения
 Np = 100;            % Число узлов сетки для каждой фазы
 %h = 1/N;             % Шаг по координате
-tMax = 300*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*30;     % Шаг по времени, с
+tMax = 25*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tau = 3600*24;     % Шаг по времени, с
 %M = floor(tMax/tau); % Число шагов по времени
 
 %%% Начальные условия
 ic = struct;                 % ic - initial conditions
 ic.s0 = 0;            % Начальные положения границы раздела сред, м
 ic.s1 = 20;
-ic.s2 = 70;
+ic.s2 = 79;
 ic.s3 = 80;
 ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 10;
@@ -64,5 +76,5 @@ hcb.Title.String = "Temperature, C";
 %set(get(hcb,'Title'),'String','A Title')
 
 subplot(3, 1, 1)
-plot(t/3600/24, bc.g3(t) - pc.Uf)
+plot(t/3600/24, bc.g5(t) - pc.Uf)
 ylabel("Temperature, C")

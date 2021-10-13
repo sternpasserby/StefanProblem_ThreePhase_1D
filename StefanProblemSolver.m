@@ -27,15 +27,20 @@ kappa = c2*rho2/lambda2 * lambda1 / (c1*rho1);
 
 % Обезразмеривание исходных данных
 g0 = @(t)(bc.g0(t*t0)/U0);
+g1 = @(t)(bc.g1(t*t0)/U0);
+g2 = @(t)(bc.g2(t*t0)/U0);
 g3 = @(t)(bc.g3(t*t0)/U0);
+g4 = @(t)(bc.g4(t*t0)/U0);
+g5 = @(t)(bc.g5(t*t0)/U0);
 u1 = ic.u1/U0;
 u2 = ic.u2/U0;
 u3 = ic.u3/U0;
 tau = tau/t0;
 tMax = tMax/t0;
 Uf = Uf/U0;
-alpha(1, 2) = bc.alpha(1, 2)/x0;
-alpha(2, 2) = bc.alpha(2, 2)/x0;
+alpha(:, 2) = bc.alpha(:, 2)/x0;
+%alpha(1, 2) = bc.alpha(1, 2)/x0;
+%alpha(2, 2) = bc.alpha(2, 2)/x0;
 
 N = Np - 1;
 h = 1/N;             % Шаг по координате
@@ -110,7 +115,7 @@ for n = 1:M
     
     % Получение распределения тепла для первой фазы
     [A, b] = getSysMat(u1_past, 1, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
-       [alpha(1, :); 1 0], g0(n*tau), Uf);
+       [alpha(1, :); alpha(2, :)], g0(n*tau), g1(n*tau));
 %     [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
 %        [alpha(1, :); 1 0], g0(n*tau), Uf);
     u1 = A \ b;
@@ -118,21 +123,21 @@ for n = 1:M
     % Получение распределения тепла для второй фазы
     if isThreePhase
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-           [htc -lambda2/x0; -htc -lambda2/x0], htc*Uf, -htc*Uf);
+           [alpha(3, :); alpha(4, :)], g2(n*tau), g3(n*tau));
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %            [1 0; 1 0], Uf, Uf);
         u2 = A \ b;
 
         % Получение распределения тепла для третьей фазы
         [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
-           [1 0; -600 -lambda1/x0], Uf, -600*g3(n*tau));
+           [alpha(5, :); alpha(6, :)], g4(n*tau), g5(n*tau));
 %         [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
 %            [1 0; alpha(2, :)], Uf, g3(n*tau));
         u3 = A \ b;
     else
         %ds2dt = C2/(2*h)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2));
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-           [1 0; -600 -lambda1/x0], Uf, -600*g3(n*tau));
+           [alpha(3, :); alpha(6, :)], g2(n*tau), g5(n*tau));
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %             [1 0; alpha(2, :)], Uf, g3(n*tau));
         u2 = A \ b;
