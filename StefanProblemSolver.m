@@ -53,6 +53,7 @@ saveStep = tMax/nCols;
 saveId = 0;
 
 htc = 119.7;
+isThreePhase = true;
 
 tic;
 for n = 1:M
@@ -78,33 +79,81 @@ for n = 1:M
     s3(n+1) = s3(n) + tau*ds3dt;
     
     % Проседание льда из-за различной плотности льда и воды
-    dL = (s1(n+1) - s1(n))*( 1 - rho1/rho2 );
-    s1(n+1) = s1(n+1) + dL;
-    s2(n+1) = s2(n+1) + dL;
-    s3(n+1) = s3(n+1) + dL;
+    %dL = (s1(n+1) - s1(n))*( 1 - rho1/rho2 );
+    %s1(n+1) = s1(n+1) + dL;
+    %s2(n+1) = s2(n+1) + dL;
+    %s3(n+1) = s3(n+1) + dL;
+
+    if s2(n+1) >= s3(n+1)
+        s2(n+1) = s3(n+1);
+        ds2dt = ds3dt;
+        isThreePhase = false;
+    end
+    if s1(n+1) < s0(n+1)
+        s1(n+1) = s1(n);
+    end
     
     % Получение распределения тепла для первой фазы
     [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
-        [alpha(1, :); htc -lambda1], htc*Uf, g0(n*tau));
+       [alpha(1, :); htc -lambda1], g0(n*tau), htc*Uf);
+%     [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
+%        [alpha(1, :); 1 0], g0(n*tau), Uf);
     u1 = A \ b;
     
     % Получение распределения тепла для второй фазы
-    [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-        [htc -lambda2; -htc -lambda2], -htc*Uf, htc*Uf);
-    u2 = A \ b;
+    if isThreePhase
+        [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+           [htc -lambda2; -htc -lambda2], htc*Uf, -htc*Uf);
+%         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+%            [1 0; 1 0], Uf, Uf);
+        u2 = A \ b;
+
+        % Получение распределения тепла для третьей фазы
+        [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
+           [-htc -lambda1; -600 -lambda1], -htc*Uf, -600*g3(n*tau));
+%         [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
+%            [1 0; alpha(2, :)], Uf, g3(n*tau));
+        u3 = A \ b;
+    else
+        [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+           [htc -lambda2; alpha(2, :)], htc*Uf, g3(n*tau));
+%         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+%             [1 0; alpha(2, :)], Uf, g3(n*tau));
+        u2 = A \ b;
+        
+        u3 = u2;
+    end
     
-    % Получение распределения тепла для третьей фазы
-    [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
-        [-htc -lambda1; alpha(2, :)], g3(n*tau), -htc*Uf);
-    u3 = A \ b;
+    if u2(end) > Uf && u2(end-1) > Uf && ~isThreePhase
+        id = length(u2);
+        for s = length(u2):-1:1
+            if u2(s) < Uf
+                id = s + 1;
+                break;
+            end
+        end
+        
+        x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
+        s2(n + 1) = x(id);
+        u3 = linspace(u2(id), u2(end), Np)';
+        u2 = interp1(x(1:id), u2(1:id), s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
+        
+        %plot(s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), u2, s2(n+1) + ksi.*(s3(n+1) - s2(n+1)), u3)
+        isThreePhase = true;
+    end
     
     % Запись результатов
     t(n + 1) = tau*n;
     if (saveTime < t(n+1))
         saveTime = saveTime + saveStep;
         saveId = saveId + 1;
-        X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
-            s2(n+1) + ksi.*(s3(n+1) - s2(n+1))];
+        if isThreePhase
+            X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
+                s2(n+1) + ksi.*(s3(n+1) - s2(n+1))];
+        else
+            X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
+                ksi.*NaN];
+        end
         T(:, saveId) = ones(nRows, 1)*tau*n;
         U(:, saveId) = [u1; u2; u3];
     end

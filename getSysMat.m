@@ -1,5 +1,5 @@
 function [A, b] = getSysMat(u_past, kappa, tau, h, s_j, s_jm1, ...
-    ds_jdt, ds_jm1dt, alpha, g_j, g_jm1)
+    ds_jdt, ds_jm1dt, alpha, g_jm1, g_j)
 %GETSYSTEMMATRIX Вычисление матрицы системы для решения трёхфазной задачи
 %Стефана методом конечных разностей с применением метода выпрямления
 %фронта. Граничные условия учитываются.
