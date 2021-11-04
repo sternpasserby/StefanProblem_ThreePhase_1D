@@ -60,7 +60,7 @@ A = zeros(Np);
 b = zeros(Np, 1);
 
 %maxNRows = 500;                 % Максимальное число строк для выходных матрицы
-maxNCols = 500;                 % Максимальное число столбцой для выходных матриц
+maxNCols = inf;                 % Максимальное число столбцой для выходных матриц
 %nRows = min(2*Np, maxNRows);
 nRows = 3*Np;
 nCols = min(M, maxNCols);
@@ -75,8 +75,13 @@ saveId = 0;
 htc = 119.7;
 isThreePhase = true;
 
+time = tau;
+tau0 = tau;
+n = 1;
+dsMin = 0.01/x0;
+
 tic;
-for n = 1:M
+while time <= tMax
     u1_past = u1;
     u2_past = u2;
     u3_past = u3;
@@ -98,12 +103,17 @@ for n = 1:M
     s2(n+1) = s2(n) + tau*ds2dt;
     s3(n+1) = s3(n) + tau*ds3dt;
     
+    if abs(s2(n+1) - s2(n)) > dsMin && isThreePhase
+        tau = tau/2;
+        continue;
+    end
+    
     % Проседание льда из-за различной плотности льда и воды
     %dL = (s1(n+1) - s1(n))*( 1 - rho1/rho2 );
     %s1(n+1) = s1(n+1) + dL;
     %s2(n+1) = s2(n+1) + dL;
     %s3(n+1) = s3(n+1) + dL;
-
+   
     if s2(n+1) >= s3(n+1)
         s2(n+1) = s3(n+1);
         ds2dt = ds3dt;
@@ -115,7 +125,7 @@ for n = 1:M
     
     % Получение распределения тепла для первой фазы
     [A, b] = getSysMat(u1_past, 1, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
-       [alpha(1, :); alpha(2, :)], g0(n*tau), g1(n*tau));
+       [alpha(1, :); alpha(2, :)], g0(time), g1(time));
 %     [A, b] = getSysMat(u1_past, 1/a1_sq, tau, h, s1(n+1), s0(n + 1), ds1dt, ds0dt, ...
 %        [alpha(1, :); 1 0], g0(n*tau), Uf);
     u1 = A \ b;
@@ -123,21 +133,21 @@ for n = 1:M
     % Получение распределения тепла для второй фазы
     if isThreePhase
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-           [alpha(3, :); alpha(4, :)], g2(n*tau), g3(n*tau));
+           [alpha(3, :); alpha(4, :)], g2(time), g3(time));
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %            [1 0; 1 0], Uf, Uf);
         u2 = A \ b;
 
         % Получение распределения тепла для третьей фазы
         [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
-           [alpha(5, :); alpha(6, :)], g4(n*tau), g5(n*tau));
+           [alpha(5, :); alpha(6, :)], g4(time), g5(time));
 %         [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
 %            [1 0; alpha(2, :)], Uf, g3(n*tau));
         u3 = A \ b;
     else
         %ds2dt = C2/(2*h)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2));
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-           [alpha(3, :); alpha(6, :)], g2(n*tau), g5(n*tau));
+           [alpha(3, :); alpha(6, :)], g2(time), g5(time));
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %             [1 0; alpha(2, :)], Uf, g3(n*tau));
         u2 = A \ b;
@@ -155,17 +165,20 @@ for n = 1:M
         end
         
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
-        s2(n + 1) = x(id);
-        u3 = linspace(u2(id), u2(end), Np)';
-        u2 = interp1(x(1:id), u2(1:id), s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
+        dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
+        s2(n+1) = s3(n+1) - dl;
+        %s2(n + 1) = x(id);
+        u3 = ones(Np, 1)*Uf;
+        u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
         
         %plot(s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), u2, s2(n+1) + ksi.*(s3(n+1) - s2(n+1)), u3)
         isThreePhase = true;
     end
     
     % Запись результатов
-    t(n + 1) = tau*n;
-    if (saveTime < t(n+1))
+    t(n + 1) = time;
+    if (saveTime < time)
+        fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
         saveTime = saveTime + saveStep;
         saveId = saveId + 1;
         if isThreePhase
@@ -175,9 +188,13 @@ for n = 1:M
             X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
                 ksi.*NaN];
         end
-        T(:, saveId) = ones(nRows, 1)*tau*n;
+        T(:, saveId) = ones(nRows, 1)*time;
         U(:, saveId) = [u1; u2; u3];
     end
+    
+    n = n+1;
+    time = time + tau;
+    tau = tau0;
 end
 s = [s0;s1;s2;s3];
 
