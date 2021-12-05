@@ -77,6 +77,7 @@ time = tau;
 tau0 = tau;     % Шаг по времени, заданный пользователем
 n = 1;
 dsMin = 0.01/x0;
+dlMin = 1*1e-3/x0; % Нижняя граница толщины новой фазы
 
 tic;
 while time <= tMax
@@ -128,7 +129,7 @@ while time <= tMax
 %        [alpha(1, :); 1 0], g0(n*tau), Uf);
     u1 = A \ b;
     
-    % Получение распределения тепла для второй фазы
+    % Получение распределения тепла для второй фазы (и возможно третьей)
     if isThreePhase
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
            [alpha(3, :); alpha(4, :)], g2(time), g3(time));
@@ -156,6 +157,7 @@ while time <= tMax
         u3 = u2;
     end
     
+    % Зарождение верхней фазы
     if u2(end) > Uf && u2(end-1) > Uf && ~isThreePhase
         % Поиск номера последнего узла, который должен быть водой
         id = length(u2);
@@ -166,14 +168,18 @@ while time <= tMax
             end
         end
         
+        % Вычисление толщины новой фазы
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
         dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
-        s2(n+1) = s3(n+1) - dl;
-        u3 = ones(Np, 1)*Uf;
-        u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
         
-        %plot(s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), u2, s2(n+1) + ksi.*(s3(n+1) - s2(n+1)), u3)
-        isThreePhase = true;
+        if dl >= dlMin
+            s2(n+1) = s3(n+1) - dl;
+            u3 = ones(Np, 1)*Uf;
+            u2(id:end) = Uf;
+            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
+            isThreePhase = true;
+        end
+       
     end
     
     % Запись результатов
@@ -187,14 +193,27 @@ while time <= tMax
         x2q = s1(n+1) + ksi_save.*(s2(n+1) - s1(n+1));
         x1 = s0(n+1) + ksi.*(s1(n+1) - s0(n));
         x2 = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
+        Nf = round(nRows/3);
         if isThreePhase
             x3q = s2(n+1) + ksi_save.*(s3(n+1) - s2(n+1));
             x3 = s2(n+1) + ksi.*(s3(n+1) - s2(n+1));
             X(:, saveId) = [x1q; x2q; x3q];
             U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); interp1(x3, u3, x3q)];
+%             X(:, saveId) = [s0(n+1) + ksi_save.*(s1(n+1) - s0(n+1));...
+%                             s1(n+1) + ksi_save.*(s2(n+1) - s1(n+1));...
+%                             s2(n+1) + ksi_save.*(s3(n+1) - s2(n+1))];
+%             U(:, saveId) = [interp1(s0(n+1) + ksi.*(s1(n+1) - s0(n+1)), u1, X(1:Nf, saveId));...
+%                             interp1(s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), u2, X(Nf+1:2*Nf, saveId));...
+%                             interp1(s2(n+1) + ksi.*(s3(n+1) - s2(n+1)), u3, X(2*Nf+1:3*Nf, saveId))];
         else
             X(:, saveId) = [ x1q; x2q; ksi_save.*NaN];
             U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); ksi_save.*NaN];
+%             X(:, saveId) = [s0(n+1) + ksi_save.*(s1(n+1) - s0(n+1));...
+%                             s1(n+1) + ksi_save.*(s2(n+1) - s1(n+1));...
+%                             ksi_save.*NaN];
+%             U(:, saveId) = [interp1(s0(n+1) + ksi.*(s1(n+1) - s0(n+1)), u1, X(1:Nf, saveId));...
+%                             interp1(s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), u2, X(Nf+1:2*Nf, saveId));...
+%                             ksi_save.*NaN];
         end
         T(:, saveId) = ones(nRows, 1)*time;
         %U(:, saveId) = [u1; u2; u3];

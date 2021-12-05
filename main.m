@@ -54,7 +54,7 @@ ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 1;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np, tau);
+[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tau);
 figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 subplot(5, 1, [2 5]);
 contourf(T/3600/24, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
@@ -67,7 +67,7 @@ ylabel("X, meters")
 colormap(jet)
 caxis([-12 8])
 hcb = colorbar;
-hcb.Position = [0.9123 0.1101 0.03 0.6423];
+%hcb.Position = [0.9123 0.1101 0.03 0.6423];
 hcb.Title.String = "T, C";
 %hcb.Title.HorizontalAlignment = 'left';
 %set(get(hcb,'Title'),'String','A Title')
