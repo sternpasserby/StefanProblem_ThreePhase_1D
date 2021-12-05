@@ -1,4 +1,4 @@
-function [U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax)
+function [U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np_save, tau_save)
 %STEFANPROBLEMSOLVER Решатель трехфазной задачи Стефана
 %   На вход подаются 3 структуры, число узлов сетки для каждой фазы Np,
 %   размер временнОго шага tau и время моделирования tMax. Возвращает 3
@@ -36,6 +36,7 @@ u1 = ic.u1/U0;
 u2 = ic.u2/U0;
 u3 = ic.u3/U0;
 tau = tau/t0;
+tau_save = tau_save/t0;
 tMax = tMax/t0;
 Uf = Uf/U0;
 alpha(:, 2) = bc.alpha(:, 2)/x0;
@@ -44,7 +45,7 @@ alpha(:, 2) = bc.alpha(:, 2)/x0;
 
 N = Np - 1;
 h = 1/N;             % Шаг по координате
-M = floor(tMax/tau); % Число шагов по времени
+M = round(tMax/tau); % Число шагов по времени
 s0 = zeros(1, M + 1);
 s1 = zeros(1, M + 1);
 s2 = zeros(1, M + 1);
@@ -55,28 +56,25 @@ s1(1) = ic.s1/x0;
 s2(1) = ic.s2/x0;
 s3(1) = ic.s3/x0;
 
-ksi = linspace(0, 1, Np)';
-A = zeros(Np);
-b = zeros(Np, 1);
-
-%maxNRows = 500;                 % Максимальное число строк для выходных матрицы
-maxNCols = inf;                 % Максимальное число столбцой для выходных матриц
-%nRows = min(2*Np, maxNRows);
-nRows = 3*Np;
-nCols = min(M, maxNCols);
+nRows = min(3*Np, 3*Np_save);
+nCols = min(M, round(tMax/tau_save) );
 X = zeros(nRows, nCols);
 U = zeros(nRows, nCols);
 T = zeros(nRows, nCols);
 
+ksi = linspace(0, 1, Np)';
+ksi_save = linspace(0, 1, nRows/3)';
+A = sparse(Np);
+b = zeros(Np, 1);
+
 saveTime = 0;
-saveStep = tMax/nCols;
 saveId = 0;
 
-htc = 119.7;
+%htc = 119.7;
 isThreePhase = true;
 
 time = tau;
-tau0 = tau;
+tau0 = tau;     % Шаг по времени, заданный пользователем
 n = 1;
 dsMin = 0.01/x0;
 
@@ -92,7 +90,7 @@ while time <= tMax
     C3 = 1/beta/( s3(n) - s2(n) );
     ds0dt = 0;
     ds1dt = C2/(2*h)*(-3*u2_past(1) + 4*u2_past(2) - u2_past(3)) - ...
-        C1/(2*h)*(-u1_past(end) + 4*u1_past(end-1) - 3*u1_past(end-2));
+        C1/(2*h)*(3*u1_past(end) - 4*u1_past(end-1) + u1_past(end-2));
     ds2dt = C2/(2*h)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2)) - ...
         C3/(2*h)*(-3*u3_past(1) + 4*u3_past(2) - u3_past(3));
     ds3dt = 0;
@@ -137,6 +135,7 @@ while time <= tMax
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %            [1 0; 1 0], Uf, Uf);
         u2 = A \ b;
+        %u2 = solveWithThomas(A, b);
 
         % Получение распределения тепла для третьей фазы
         [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
@@ -144,6 +143,7 @@ while time <= tMax
 %         [A, b] = getSysMat(u3_past, 1/a1_sq, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
 %            [1 0; alpha(2, :)], Uf, g3(n*tau));
         u3 = A \ b;
+        %u3 = solveWithThomas(A, b);
     else
         %ds2dt = C2/(2*h)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2));
         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
@@ -151,11 +151,13 @@ while time <= tMax
 %         [A, b] = getSysMat(u2_past, 1/a2_sq, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
 %             [1 0; alpha(2, :)], Uf, g3(n*tau));
         u2 = A \ b;
+        %u2 = solveWithThomas(A, b);
         
         u3 = u2;
     end
     
     if u2(end) > Uf && u2(end-1) > Uf && ~isThreePhase
+        % Поиск номера последнего узла, который должен быть водой
         id = length(u2);
         for s = length(u2):-1:1
             if u2(s) < Uf
@@ -167,7 +169,6 @@ while time <= tMax
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
         dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
         s2(n+1) = s3(n+1) - dl;
-        %s2(n + 1) = x(id);
         u3 = ones(Np, 1)*Uf;
         u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
         
@@ -179,17 +180,24 @@ while time <= tMax
     t(n + 1) = time;
     if (saveTime < time)
         fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
-        saveTime = saveTime + saveStep;
+        saveTime = saveTime + tau_save;
         saveId = saveId + 1;
+        
+        x1q = s0(n+1) + ksi_save.*(s1(n+1) - s0(n));
+        x2q = s1(n+1) + ksi_save.*(s2(n+1) - s1(n+1));
+        x1 = s0(n+1) + ksi.*(s1(n+1) - s0(n));
+        x2 = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
         if isThreePhase
-            X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
-                s2(n+1) + ksi.*(s3(n+1) - s2(n+1))];
+            x3q = s2(n+1) + ksi_save.*(s3(n+1) - s2(n+1));
+            x3 = s2(n+1) + ksi.*(s3(n+1) - s2(n+1));
+            X(:, saveId) = [x1q; x2q; x3q];
+            U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); interp1(x3, u3, x3q)];
         else
-            X(:, saveId) = [ s0(n) + ksi.*(s1(n+1) - s0(n)); s1(n+1) + ksi.*(s2(n+1) - s1(n+1));...
-                ksi.*NaN];
+            X(:, saveId) = [ x1q; x2q; ksi_save.*NaN];
+            U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); ksi_save.*NaN];
         end
         T(:, saveId) = ones(nRows, 1)*time;
-        U(:, saveId) = [u1; u2; u3];
+        %U(:, saveId) = [u1; u2; u3];
     end
     
     n = n+1;

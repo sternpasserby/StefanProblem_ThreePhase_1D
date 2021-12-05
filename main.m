@@ -35,10 +35,10 @@ bc.g2 = @(t)(pc.Uf);
 bc.g3 = @(t)(pc.Uf);
 bc.g4 = @(t)(pc.Uf);
 bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
-%bc.g5 = @(t)(-10 + 273.15);
+%bc.g5 = @(t)(0 + 273.15);
 
 %%% Параметры численного решения
-Np = 100;            % Число узлов сетки для каждой фазы
+Np = 500;            % Число узлов сетки для каждой фазы
 %h = 1/N;             % Шаг по координате
 tMax = 10*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24;     % Шаг по времени, с
@@ -47,17 +47,17 @@ tau = 3600*24;     % Шаг по времени, с
 %%% Начальные условия
 ic = struct;                 % ic - initial conditions
 ic.s0 = 0;            % Начальные положения границы раздела сред, м
-ic.s1 = 20;
-ic.s2 = 78;
-ic.s3 = 80;
+ic.s1 = 1;
+ic.s2 = 9;
+ic.s3 = 10;
 ic.u1 = zeros(1, Np) + 273.15 + 0;
-ic.u2 = zeros(1, Np) + 273.15 - 10;
-ic.u3 = zeros(1, Np) + 273.15 + 10;
+ic.u2 = zeros(1, Np) + 273.15 - 1;
+ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax);
-figure('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
-subplot(3, 1, [2 3])
-contourf(T/3600/24, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5)
+[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np, tau);
+figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
+subplot(5, 1, [2 5]);
+contourf(T/3600/24, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
 axis([-inf inf ic.s0 ic.s3])
 hold on
 plot(t/3600/24, s, '-w', 'LineWidth', 2)
@@ -67,10 +67,22 @@ ylabel("X, meters")
 colormap(jet)
 caxis([-12 8])
 hcb = colorbar;
-hcb.Title.String = "Temperature, C";
+hcb.Position = [0.9123 0.1101 0.03 0.6423];
+hcb.Title.String = "T, C";
+%hcb.Title.HorizontalAlignment = 'left';
 %set(get(hcb,'Title'),'String','A Title')
+%axis([2600 3450 79 80])
 
-subplot(3, 1, 1)
-plot(t/3600/24, bc.g5(t) - pc.Uf)
-ylabel("Temperature, C")
+%subplot(5, 1, 1);
+%hcb.Position(1) = ax.Position(1);
+%plot(t/3600/24, bc.g5(t) - pc.Uf)
+%axis([min(t)/3600/24 max(t)/3600/24 -inf inf])
+%axis([2600 3450 -inf inf])
+%ylabel("Temperature, C")
+
+% plot(t/3600/24/365.25, s(2, :))
+% xlabel("t, years")
+% ylabel("X, meters")
+% lg = legend("$s_2(t)$");
+% lg.Interpreter = 'latex';
 

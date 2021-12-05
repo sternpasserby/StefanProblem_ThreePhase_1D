@@ -7,7 +7,7 @@ function [A, b] = getSysMat(u_past, kappa, tau, h, s_j, s_jm1, ...
 
 C1 = kappa*(s_j - s_jm1)^2/tau;
 Np = length(u_past);
-A = zeros(Np);
+A = sparse(Np);
 b = zeros(Np, 1);
 
 C3 = alpha(1, 2)/(2*h);
@@ -23,9 +23,9 @@ for i = 2:Np-1
     b(i) = -C1*u_past(i);
 end
 C4 = alpha(2, 2)/(2*h);
-A(end, end - 2) = C4;
-A(end, end - 1) = -4*C4;
-A(end, end) = 3*C4 + alpha(2, 1)*(s_j - s_jm1);
-b(end) = g_j*(s_j - s_jm1);
+A(Np, Np - 2) = C4;
+A(Np, Np - 1) = -4*C4;
+A(Np, Np) = 3*C4 + alpha(2, 1)*(s_j - s_jm1);
+b(Np) = g_j*(s_j - s_jm1);
 end
 
