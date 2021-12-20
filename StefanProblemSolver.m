@@ -111,6 +111,10 @@ n = 1;
 dsMin = 0.01/x0;
 dlMin = 1*1e-3/x0; % Нижняя граница толщины новой фазы
 
+A = sparse(Np);
+%A = spdiags(-ones(Np, 1)*(2/h_sq + C1), 0, Np, Np);
+b = zeros(Np, 1);
+
 tic;
 while time <= tMax
     u1_past = u1;
@@ -179,6 +183,7 @@ while time <= tMax
         [A, b] = getSysMat(u1_past, 1, tau, h, s1(n+1), s0(n+1), ds1dt, ds0dt, ...
            alpha(1:2, :), g0(time), g1(time));
         u1 = A \ b;
+        %u1 = solveWithThomas(A, b);
     end
     
     % Получение распределения тепла для второй фазы
@@ -214,6 +219,7 @@ while time <= tMax
         [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
            alpha(5:6, :), g4(time), g5(time));
         u3 = A \ b;
+        %u3 = solveWithThomas(A, b);
     end
         %u3 = solveWithThomas(A, b);
 %     else

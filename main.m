@@ -29,7 +29,7 @@ bc.alpha = [0 -pc.lambda1;
             1 0
             1 0
             1 0];
-bc.g0 = @(t)(0.5);
+bc.g0 = @(t)(0.05);
 bc.g1 = @(t)(pc.Uf);
 bc.g2 = @(t)(pc.Uf);
 bc.g3 = @(t)(pc.Uf);
@@ -38,7 +38,7 @@ bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимани�
 %bc.g5 = @(t)(1 + 273.15);
 
 %%% Параметры численного решения
-Np = 500;            % Число узлов сетки для каждой фазы
+Np = 1000;            % Число узлов сетки для каждой фазы
 tMax = 10*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24;     % Шаг по времени, с
 
@@ -46,27 +46,27 @@ tau = 3600*24;     % Шаг по времени, с
 ic = struct;                 % ic - initial conditions
 ic.s0 = 0;            % Начальные положения границы раздела сред, м
 ic.s1 = 0;
-ic.s2 = 9;
-ic.s3 = 10;
+ic.s2 = 90;
+ic.s3 = 100;
 ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 1;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tau);
-plot(s', '.')
-% figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
-% subplot(5, 1, [2 5]);
-% contourf(T/3600/24, X, U - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-% axis([-inf inf ic.s0 ic.s3])
-% hold on
-% plot(t/3600/24, s, '-w', 'LineWidth', 2)
-% hold off
-% xlabel("t, days")
-% ylabel("X, meters")
-% colormap(jet)
-% caxis([-12 8])
-% hcb = colorbar;
-% hcb.Title.String = "T, C";
+[U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tau*14);
+% plot(s', '.')
+figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
+subplot(5, 1, [2 5]);
+contourf(T(:, 1:end-1)/3600/24, X(:, 1:end-1), U(:, 1:end-1) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
+axis([-inf inf ic.s0 ic.s3])
+hold on
+plot(t/3600/24, s, '-w', 'LineWidth', 2)
+hold off
+xlabel("t, days")
+ylabel("X, meters")
+colormap(jet)
+caxis([-12 3])
+hcb = colorbar;
+hcb.Title.String = "T, C";
 
 %hcb.Position = [0.9123 0.1101 0.03 0.6423];
 %hcb.Title.HorizontalAlignment = 'left';
