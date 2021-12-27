@@ -1,4 +1,4 @@
-function [U, X, T, s, t] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np_save, tau_save)
+function [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np_save, tau_save)
 %STEFANPROBLEMSOLVER Решатель трехфазной задачи Стефана
 %   На вход подаются 3 структуры, число узлов сетки для каждой фазы Np,
 %   размер временнОго шага tau и время моделирования tMax. Возвращает 3
@@ -19,7 +19,8 @@ rho = (rho1 + rho2)/2;
 alpha = bc.alpha;
 
 % Задание характерных параметров для обезразмеривания
-x0 = 1;
+x0 = ic.s3 - ic.s0;
+%x0 = 1;
 t0 = rho1*c1*x0*x0/lambda1;
 U0 = Uf;
 beta = qf*rho / (rho1*c1*U0);
@@ -48,7 +49,7 @@ alpha(:, 2) = bc.alpha(:, 2)/x0;
 
 N = Np - 1;
 h = 1/N;             % Шаг по координате
-M = round(tMax/tau); % Число шагов по времени
+M = ceil(tMax/tau); % Число шагов по времени
 s0 = zeros(1, M + 1);
 s1 = zeros(1, M + 1);
 s2 = zeros(1, M + 1);
@@ -61,9 +62,9 @@ s3(1) = ic.s3/x0;
 
 nRows = min(3*Np, 3*Np_save);
 nCols = min(M, round(tMax/tau_save) );
-X = zeros(nRows, nCols + 1);
-U = zeros(nRows, nCols + 1);
-T = zeros(nRows, nCols + 1);
+X = zeros(nRows, nCols);
+U = zeros(nRows, nCols);
+T = zeros(nRows, nCols);
 
 ksi = linspace(0, 1, Np)';
 ksi_save = linspace(0, 1, nRows/3)';
@@ -242,7 +243,8 @@ while time <= tMax
         
         % Вычисление толщины новой фазы
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
-        dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
+        %dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
+        dl = c2*rho2/qf/rho1*trapz(x(id:end), abs(u2(id:end) - Uf)*U0);
         
         if dl >= dlMin
             s2(n+1) = s3(n+1) - dl;
@@ -267,7 +269,7 @@ while time <= tMax
         
         % Вычисление толщины новой фазы
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
-        dl = c2/qf*trapz(x(1:id), abs(u2(1:id) - Uf)*U0)/x0;
+        dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(u2(1:id) - Uf)*U0);
         
         if dl >= dlMin
             s1(n+1) = s0(n+1) + dl;
