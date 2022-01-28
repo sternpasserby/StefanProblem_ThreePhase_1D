@@ -29,7 +29,7 @@ bc.alpha = [0 -pc.lambda1;
             1 0
             1 0
             1 0];
-bc.g0 = @(t)(0.5);
+bc.g0 = @(t)(0.05);
 bc.g1 = @(t)(pc.Uf);
 bc.g2 = @(t)(pc.Uf);
 bc.g3 = @(t)(pc.Uf);
@@ -42,18 +42,32 @@ Np = 1000;            % Число узлов сетки для каждой ф�
 tMax = 10*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 %tMax = 100*24*3600;
 tau = 3600*24;     % Шаг по времени, с
+tauSave = 3600*24*365.25/2;
 
 %%% Начальные условия
-ic = struct;                 % ic - initial conditions
-ic.s0 = 0;            % Начальные положения границы раздела сред, м
-ic.s1 = 0;
-ic.s2 = 9;
-ic.s3 = 10;
+% 1897000,-3000,820,0,3310,2490,52.621367149353,85.577331466675,1.6650680303574
+ic = struct;
+ic.s0 = 820;
+ic.s1 = 3310 - 2490;
+ic.s2 = 3310;
+ic.s3 = 3310;
+% ic = struct;                 % ic - initial conditions
+% ic.s0 = 0;            % Начальные положения границы раздела сред, м
+% ic.s1 = 0;
+% ic.s2 = 9;
+% ic.s3 = 10;
 ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 1;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tau*14);
+% ic.s0 = -800;
+% ic.s1 = -800;
+% ic.s2 = 1407;
+% ic.s3 = 1408;
+% GHF = 75.7157;
+% bc.g0 =  @(t)(GHF/1000);
+
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tauSave);
 % plot(s', '.')
 figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 subplot(5, 1, [2 5]);
@@ -68,6 +82,25 @@ colormap(jet)
 caxis([-12 3])
 hcb = colorbar;
 hcb.Title.String = "T, C";
+
+% h = figure;
+% axis tight manual
+% filename = 'testnew51.gif';
+% %vid = VideoWriter(filename);
+% %open(vid);
+% for i = 1:30:length(t)
+%     bar([1;nan], [s(1, i), s(2, i) - s(1, i), s(3, i) - s(2, i), s(4, i) - s(3, i); nan(1,4)], 'stacked')
+%     title(sprintf("time = %6.2f days", t(i)/3600/24));
+%     drawnow
+%     frame = getframe(h);
+%     im = frame2im(frame);
+%     [imind,cm] = rgb2ind(im,256);
+%     if i == 1
+%         imwrite(imind,cm,filename,'gif', 'Loopcount',inf, 'DelayTime', 0);
+%     else
+%         imwrite(imind,cm,filename,'gif','WriteMode','append', 'DelayTime', 0);
+%     end
+% end
 
 %hcb.Position = [0.9123 0.1101 0.03 0.6423];
 %hcb.Title.HorizontalAlignment = 'left';

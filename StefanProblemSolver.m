@@ -77,7 +77,7 @@ if s0(1) == s1(1)
     isLowerPhase = false;
 end
 if s3(1) == s2(1)
-    isUpperPhase = true;
+    isUpperPhase = false;
 end
 
 % Запись начальных условий в выходные массивы
@@ -106,7 +106,7 @@ X(:, 1) = [x1q; x2q; x3q];
 saveTime = tau_save;
 saveId = 1;
 
-time = tau;
+time = 0;
 tau0 = tau;     % Шаг по времени, заданный пользователем
 n = 1;
 dsMin = 0.01/x0;
@@ -178,6 +178,7 @@ while time <= tMax
         %g2 = g0;
         isLowerPhase = false;
     end
+    time = time + tau;
     
     % Получение распределения тепла для первой фазы (если она есть)
     if isLowerPhase
@@ -250,7 +251,7 @@ while time <= tMax
             s2(n+1) = s3(n+1) - dl;
             u3 = ones(Np, 1)*Uf;
             u2(id:end) = Uf;
-            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
+            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isUpperPhase = true;
         end
        
@@ -275,7 +276,7 @@ while time <= tMax
             s1(n+1) = s0(n+1) + dl;
             u1 = ones(Np, 1)*Uf;
             u2(1:id) = Uf;
-            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)));
+            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isLowerPhase = true;
         end
     end
@@ -292,16 +293,16 @@ while time <= tMax
         x3 = s2(n+1) + ksi.*(s3(n+1) - s2(n+1));
         if isLowerPhase
             x1q = s0(n+1) + ksi_save.*(s1(n+1) - s0(n+1));
-            u1q = interp1(x1, u1, x1q);
+            u1q = interp1(x1, u1, x1q, 'linear', 'extrap');
         else
             x1q = ksi_save.*NaN;
             u1q = ksi_save.*NaN;
         end
         x2q = s1(n+1) + ksi_save.*(s2(n+1) - s1(n+1));
-        u2q = interp1(x2, u2, x2q);
+        u2q = interp1(x2, u2, x2q, 'linear', 'extrap');
         if isUpperPhase
             x3q = s2(n+1) + ksi_save.*(s3(n+1) - s2(n+1));
-            u3q = interp1(x3, u3, x3q);
+            u3q = interp1(x3, u3, x3q, 'linear', 'extrap');
         else
             x3q = ksi_save.*NaN;
             u3q = ksi_save.*NaN;
@@ -321,7 +322,6 @@ while time <= tMax
     end
     
     n = n+1;
-    time = time + tau;
     tau = tau0;
 end
 s = [s0;s1;s2;s3];
