@@ -184,7 +184,8 @@ while time <= tMax
     if isLowerPhase
         [A, b] = getSysMat(u1_past, 1, tau, h, s1(n+1), s0(n+1), ds1dt, ds0dt, ...
            alpha(1:2, :), g0(time), g1(time));
-        u1 = A \ b;
+        %u1 = A \ b;
+        u1 = solveWithBackslash(A, b);
         %u1 = solveWithThomas(A, b);
     end
     
@@ -213,14 +214,16 @@ while time <= tMax
     end
     [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
         [alphaLower; alphaUpper], gLower(time), gUpper(time));
-    u2 = A \ b;
+    %u2 = A \ b;
+    u2 = solveWithBackslash(A, b);
     %u2 = solveWithThomas(A, b);
     
     % Получение распределения тепла для третьей фазы
     if isUpperPhase
         [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
            alpha(5:6, :), g4(time), g5(time));
-        u3 = A \ b;
+        %u3 = A \ b;
+        u3 = solveWithBackslash(A, b);
         %u3 = solveWithThomas(A, b);
     end
         %u3 = solveWithThomas(A, b);
