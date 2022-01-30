@@ -17,10 +17,11 @@ Uf = pc.Uf;
 qf = pc.qf;
 rho = (rho1 + rho2)/2;
 alpha = bc.alpha;
+accumRate = ic.accumRate;
 
 % Задание характерных параметров для обезразмеривания
-x0 = ic.s3 - ic.s0;
-%x0 = 1;
+%x0 = ic.s3 - ic.s0;
+x0 = 1;
 t0 = rho1*c1*x0*x0/lambda1;
 U0 = Uf;
 beta = qf*rho / (rho1*c1*U0);
@@ -41,11 +42,6 @@ tau_save = tau_save/t0;
 tMax = tMax/t0;
 Uf = Uf/U0;
 alpha(:, 2) = bc.alpha(:, 2)/x0;
-
-% Сохранение изначальных граничных условий для второй фазы
-% alpha2_init = alpha(3:4, :);
-% g2_init = g2;
-% g3_init = g3;
 
 N = Np - 1;
 h = 1/N;             % Шаг по координате
@@ -161,15 +157,11 @@ while time <= tMax
     if s2(n+1) >= s3(n+1) && isUpperPhase
         s2(n+1) = s3(n+1);
         ds2dt = ds3dt;
-        %alpha(4, :) = alpha(6, :);
-        %g3 = g5;
         isUpperPhase = false;
     end
     if s1(n+1) <= s0(n+1) && isLowerPhase
         s1(n+1) = s0(n+1);
         ds1dt = ds0dt;
-        %alpha(3, :) = alpha(1, :);
-        %g2 = g0;
         isLowerPhase = false;
     end
     time = time + tau;
@@ -185,24 +177,16 @@ while time <= tMax
     
     % Получение распределения тепла для второй фазы
     if isUpperPhase
-        %sUpper = s2(n+1);
-        %dsUpperdt = ds2dt;
         alphaUpper = alpha(4, :);
         gUpper = g3;
     else
-        %sUpper = s3(n+1);
-        %dsUpperdt = ds3dt;
         alphaUpper = alpha(6, :);
         gUpper = g5;
     end
     if isLowerPhase
-        %sLower = s1(n+1);
-        %dsLowerdt = ds1dt;
         alphaLower = alpha(3, :);
         gLower = g2;
     else
-        %sLower = s0(n+1);
-        %dsLowerdt = ds0dt;
         alphaLower = alpha(1, :);
         gLower = g0;
     end
@@ -220,13 +204,6 @@ while time <= tMax
         u3 = solveWithBackslash(A, b);
         %u3 = solveWithThomas(A, b);
     end
-        %u3 = solveWithThomas(A, b);
-%     else
-%         [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
-%            [alpha(3, :); alpha(6, :)], g2(time), g5(time));
-%         u2 = A \ b;
-%         %u2 = solveWithThomas(A, b);
-%     end
     
     % Зарождение верхней фазы
     if u2(end) > Uf && u2(end-1) > Uf && ~isUpperPhase
@@ -241,7 +218,6 @@ while time <= tMax
         
         % Вычисление толщины новой фазы
         x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
-        %dl = c2/qf*trapz(x(id:end), abs(u2(id:end) - Uf)*U0)/x0;
         dl = c2*rho2/qf/rho1*trapz(x(id:end), abs(u2(id:end) - Uf)*U0);
         
         if dl >= dlMin
@@ -250,9 +226,6 @@ while time <= tMax
             u2(id:end) = Uf;
             u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isUpperPhase = true;
-%             dL = dl*(rho2/rho1 - 1);
-%             s3(n+1) = s3(n+1) + dL;
-%             s2(n+1) = s2(n+1) + dL;
         end
        
     end
@@ -286,6 +259,11 @@ while time <= tMax
     s2(n+1) = s2(n+1) + dL;
     s3(n+1) = s3(n+1) + dL;
     
+    % Аккумуляция
+    dL = accumRate/(365.25*24*3600)*tau*t0/rho2/x0;
+    s2(n+1) = s2(n+1) + dL;
+    s3(n+1) = s3(n+1) + dL;
+    
     % Запись результатов
     t(n + 1) = time;
     if (saveTime < time)
@@ -312,15 +290,6 @@ while time <= tMax
             x3q = ksi_save.*NaN;
             u3q = ksi_save.*NaN;
         end
-        
-        %Nf = round(nRows/3);
-%         if isUpperPhase
-%             X(:, saveId) = [x1q; x2q; x3q];
-%             U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); interp1(x3, u3, x3q)];
-%         else
-%             X(:, saveId) = [ x1q; x2q; ksi_save.*NaN];
-%             U(:, saveId) = [interp1(x1, u1, x1q); interp1(x2, u2, x2q); ksi_save.*NaN];
-%         end
         U(:, saveId) = [u1q; u2q; u3q];
         X(:, saveId) = [x1q; x2q; x3q];
         T(:, saveId) = ones(nRows, 1)*time;
