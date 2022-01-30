@@ -157,12 +157,6 @@ while time <= tMax
         ds1dt = ds0dt;
     end
     
-    % Проседание льда из-за различной плотности льда и воды
-    %dL = (s1(n+1) - s1(n))*( 1 - rho1/rho2 );
-    %s1(n+1) = s1(n+1) + dL;
-    %s2(n+1) = s2(n+1) + dL;
-    %s3(n+1) = s3(n+1) + dL;
-    
     % Вырождение верхней и нижней фаз
     if s2(n+1) >= s3(n+1) && isUpperPhase
         s2(n+1) = s3(n+1);
@@ -256,6 +250,9 @@ while time <= tMax
             u2(id:end) = Uf;
             u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isUpperPhase = true;
+%             dL = dl*(rho2/rho1 - 1);
+%             s3(n+1) = s3(n+1) + dL;
+%             s2(n+1) = s2(n+1) + dL;
         end
        
     end
@@ -283,6 +280,11 @@ while time <= tMax
             isLowerPhase = true;
         end
     end
+    
+    % Проседание льда из-за различной плотности льда и воды
+    dL = (s1(n+1) - s1(n) - (s2(n+1) - s2(n)) )*( 1 - rho1/rho2 );
+    s2(n+1) = s2(n+1) + dL;
+    s3(n+1) = s3(n+1) + dL;
     
     % Запись результатов
     t(n + 1) = time;

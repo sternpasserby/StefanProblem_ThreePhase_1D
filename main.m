@@ -39,7 +39,7 @@ bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимани�
 
 %%% Параметры численного решения
 Np = 10000;            % Число узлов сетки для каждой фазы
-tMax = 10*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 %tMax = 100*24*3600;
 tau = 3600*24;     % Шаг по времени, с
 tauSave = 3600*24*365.25/2;
@@ -68,20 +68,33 @@ ic.u3 = zeros(1, Np) + 273.15 + 1;
 % bc.g0 =  @(t)(GHF/1000);
 
 [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tauSave);
-% plot(s', '.')
-figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
-subplot(5, 1, [2 5]);
-contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-axis([-inf inf ic.s0 ic.s3])
-hold on
-plot(t/3600/24, s, '-w', 'LineWidth', 2)
-hold off
+% % plot(s', '.')
+% figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
+% subplot(5, 1, [2 5]);
+% contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
+% axis([-inf inf ic.s0 ic.s3])
+% hold on
+% plot(t/3600/24, s, '-w', 'LineWidth', 2)
+% hold off
+% xlabel("t, days")
+% ylabel("X, meters")
+% colormap(jet)
+% caxis([-12 3])
+% hcb = colorbar;
+% hcb.Title.String = "T, C";
+
+% Проверка закона сохранения массы
+m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
+subplot(3, 1, 1)
+plot(t/3600/24, m)
 xlabel("t, days")
 ylabel("X, meters")
-colormap(jet)
-caxis([-12 3])
-hcb = colorbar;
-hcb.Title.String = "T, C";
+title("m(t)")
+subplot(3, 1, [2 3])
+plot(t/3600/24, s)
+xlabel("t, days")
+ylabel("X, meters")
+title("s(t)")
 
 % h = figure;
 % axis tight manual
