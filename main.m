@@ -46,20 +46,22 @@ tauSave = 3600*24*365.25/2;
 
 %%% Начальные условия
 % 1897000,-3000,820,0,3310,2490,52.621367149353,85.577331466675,1.6650680303574
-% ic = struct;
-% ic.s0 = 820;
-% ic.s1 = 3310 - 2490;
-% ic.s2 = 3310;
-% ic.s3 = 3310;
-ic = struct;                 % ic - initial conditions
-ic.s0 = 0;            % Начальные положения границы раздела сред, м
-ic.s1 = 0;
-ic.s2 = 9;
-ic.s3 = 10;
+ic = struct;
+ic.s0 = 820;
+ic.s1 = 3310 - 2490;
+ic.s2 = 3310;
+ic.s3 = 3310;
+ic.accumRate = 85.577331466675;
+bc.g0 = @(t)(52.621367149353/1000);
+% ic = struct;                 % ic - initial conditions
+% ic.s0 = 0;            % Начальные положения границы раздела сред, м
+% ic.s1 = 0;
+% ic.s2 = 9;
+% ic.s3 = 10;
+% ic.accumRate = 500;    % Скорость аккумуляции, кг/(м^2*год)
 ic.u1 = zeros(1, Np) + 273.15 + 0;
-ic.u2 = zeros(1, Np) + 273.15 - 1;
+ic.u2 = zeros(1, Np) + 273.15 -1;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
-ic.accumRate = 500;    % Скорость аккумуляции, кг/(м^2*год)
 
 % ic.s0 = -800;
 % ic.s1 = -800;
@@ -68,23 +70,24 @@ ic.accumRate = 500;    % Скорость аккумуляции, кг/(м^2*г�
 % GHF = 75.7157;
 % bc.g0 =  @(t)(GHF/1000);
 
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, 100, tauSave);
-% % plot(s', '.')
-% figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
-% subplot(5, 1, [2 5]);
-% contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-% axis([-inf inf ic.s0 ic.s3])
-% hold on
-% plot(t/3600/24, s, '-w', 'LineWidth', 2)
-% hold off
-% xlabel("t, days")
-% ylabel("X, meters")
-% colormap(jet)
-% caxis([-12 3])
-% hcb = colorbar;
-% hcb.Title.String = "T, C";
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 0.05, tau, tMax, 10000, tauSave);
+% plot(s', '.')
+figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
+subplot(5, 1, [2 5]);
+contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
+axis([-inf inf ic.s0 ic.s3])
+hold on
+plot(t/3600/24, s, '-w', 'LineWidth', 2)
+hold off
+xlabel("t, days")
+ylabel("X, meters")
+colormap(jet)
+caxis([-12 3])
+hcb = colorbar;
+hcb.Title.String = "T, C";
 
 % Проверка закона сохранения массы
+figure
 m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
 subplot(3, 1, 1)
 plot(t/3600/24, m)

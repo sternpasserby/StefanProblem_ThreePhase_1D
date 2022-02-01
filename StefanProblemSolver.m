@@ -1,4 +1,4 @@
-function [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, Np, tau, tMax, Np_save, tau_save)
+function [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, h, tau, tMax, Np_save, tau_save)
 %STEFANPROBLEMSOLVER Решатель трехфазной задачи Стефана
 %   На вход подаются 3 структуры, число узлов сетки для каждой фазы Np,
 %   размер временнОго шага tau и время моделирования tMax. Возвращает 3
@@ -19,9 +19,18 @@ rho = (rho1 + rho2)/2;
 alpha = bc.alpha;
 accumRate = ic.accumRate;
 
+% Задание числа узлов на каждую фазу
+Np_min = 100;
+Np1 = max(Np_min, ceil((ic.s1 - ic.s0)/h) );
+Np2 = max(Np_min, ceil((ic.s2 - ic.s1)/h) );
+Np3 = max(Np_min, ceil((ic.s3 - ic.s2)/h) );
+h1 = 1/(Np1 - 1);
+h2 = 1/(Np2 - 1);
+h3 = 1/(Np3 - 1);
+
 % Задание характерных параметров для обезразмеривания
-%x0 = ic.s3 - ic.s0;
-x0 = 1;
+x0 = ic.s3 - ic.s0;
+%x0 = 1;
 t0 = rho1*c1*x0*x0/lambda1;
 U0 = Uf;
 beta = qf*rho / (rho1*c1*U0);
@@ -43,8 +52,6 @@ tMax = tMax/t0;
 Uf = Uf/U0;
 alpha(:, 2) = bc.alpha(:, 2)/x0;
 
-N = Np - 1;
-h = 1/N;             % Шаг по координате
 M = ceil(tMax/tau); % Число шагов по времени
 s0 = zeros(1, M + 1);
 s1 = zeros(1, M + 1);
@@ -56,16 +63,22 @@ s1(1) = ic.s1/x0;
 s2(1) = ic.s2/x0;
 s3(1) = ic.s3/x0;
 
-nRows = min(3*Np, 3*Np_save);
+nRows = 3*min(min(min(Np1, Np2), Np3), Np_save);
 nCols = min(M, round(tMax/tau_save) );
 X = zeros(nRows, nCols);
 U = zeros(nRows, nCols);
 T = zeros(nRows, nCols);
 
-ksi = linspace(0, 1, Np)';
+ksi1 = linspace(0, 1, Np1)';
+ksi2 = linspace(0, 1, Np2)';
+ksi3 = linspace(0, 1, Np3)';
 ksi_save = linspace(0, 1, nRows/3)';
-A = sparse(Np);
-b = zeros(Np, 1);
+A1 = sparse(Np1);
+A2 = sparse(Np2);
+A3 = sparse(Np3);
+b1 = zeros(Np1, 1);
+b2 = zeros(Np2, 1);
+b3 = zeros(Np3, 1);
 
 isUpperPhase = true;
 isLowerPhase = true;
@@ -76,20 +89,38 @@ if s3(1) == s2(1)
     isUpperPhase = false;
 end
 
+if isLowerPhase
+    x1 = linspace(s0(1), s1(1), length(u1));
+    x1q = s0(1) + ksi1.*(s1(1) - s0(1));
+    u1 = interp1(x1, u1, x1q);
+else
+    u1 = ksi1.*NaN;
+end
+x2 = linspace(s1(1), s2(1), length(u2));
+x2q = s1(1) + ksi2.*(s2(1) - s1(1));
+u2 = interp1(x2, u2, x2q);
+if isUpperPhase
+    x3 = linspace(s2(1), s3(1), length(u3));
+    x3q = s2(1) + ksi3.*(s3(1) - s2(1));
+    u3 = interp1(x3, u3, x3q);
+else
+    u3 = ksi3.*NaN;
+end
+
 % Запись начальных условий в выходные массивы
 if isLowerPhase
-    x1 = s0(1) + ksi.*(s1(1) - s0(1));
+    x1 = s0(1) + ksi1.*(s1(1) - s0(1));
     x1q = s0(1) + ksi_save.*(s1(1) - s0(1));
     u1q = interp1(x1, u1, x1q);
 else
     x1q = ksi_save.*NaN;
     u1q = ksi_save.*NaN;
 end
-x2 = s1(1) + ksi.*(s2(1) - s1(1));
+x2 = s1(1) + ksi2.*(s2(1) - s1(1));
 x2q = s1(1) + ksi_save.*(s2(1) - s1(1));
 u2q = interp1(x2, u2, x2q);
 if isUpperPhase
-    x3 = s2(1) + ksi.*(s3(1) - s2(1));
+    x3 = s2(1) + ksi3.*(s3(1) - s2(1));
     x3q = s2(1) + ksi_save.*(s3(1) - s2(1));
     u3q = interp1(x3, u3, x3q);
 else
@@ -108,10 +139,6 @@ n = 1;
 dsMin = 0.01/x0;
 dlMin = 1*1e-3/x0; % Нижняя граница толщины новой фазы
 
-A = sparse(Np);
-%A = spdiags(-ones(Np, 1)*(2/h_sq + C1), 0, Np, Np);
-b = zeros(Np, 1);
-
 tic;
 while time <= tMax
     u1_past = u1;
@@ -123,10 +150,10 @@ while time <= tMax
     C2 = lambda2/(lambda1*beta*( s2(n) - s1(n) ));
     C3 = 1/beta/( s3(n) - s2(n) );
     ds0dt = 0;
-    ds1dt = C2/(2*h)*(-3*u2_past(1) + 4*u2_past(2) - u2_past(3)) - ...
-        C1/(2*h)*(3*u1_past(end) - 4*u1_past(end-1) + u1_past(end-2));
-    ds2dt = C2/(2*h)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2)) - ...
-        C3/(2*h)*(-3*u3_past(1) + 4*u3_past(2) - u3_past(3));
+    ds1dt = C2/(2*h2)*(-3*u2_past(1) + 4*u2_past(2) - u2_past(3)) - ...
+        C1/(2*h1)*(3*u1_past(end) - 4*u1_past(end-1) + u1_past(end-2));
+    ds2dt = C2/(2*h2)*(-u2_past(end) + 4*u2_past(end-1) - 3*u2_past(end-2)) - ...
+        C3/(2*h3)*(-3*u3_past(1) + 4*u3_past(2) - u3_past(3));
     ds3dt = 0;
     
     % Интегрирование уравнений движения границ
@@ -168,10 +195,10 @@ while time <= tMax
     
     % Получение распределения тепла для первой фазы (если она есть)
     if isLowerPhase
-        [A, b] = getSysMat(u1_past, 1, tau, h, s1(n+1), s0(n+1), ds1dt, ds0dt, ...
+        [A1, b1] = getSysMat(u1_past, 1, tau, h1, s1(n+1), s0(n+1), ds1dt, ds0dt, ...
            alpha(1:2, :), g0(time), g1(time));
         %u1 = A \ b;
-        u1 = solveWithBackslash(A, b);
+        u1 = solveWithBackslash(A1, b1);
         %u1 = solveWithThomas(A, b);
     end
     
@@ -190,18 +217,18 @@ while time <= tMax
         alphaLower = alpha(1, :);
         gLower = g0;
     end
-    [A, b] = getSysMat(u2_past, kappa, tau, h, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
+    [A2, b2] = getSysMat(u2_past, kappa, tau, h2, s2(n+1), s1(n+1), ds2dt, ds1dt, ...
         [alphaLower; alphaUpper], gLower(time), gUpper(time));
     %u2 = A \ b;
-    u2 = solveWithBackslash(A, b);
+    u2 = solveWithBackslash(A2, b2);
     %u2 = solveWithThomas(A, b);
     
     % Получение распределения тепла для третьей фазы
     if isUpperPhase
-        [A, b] = getSysMat(u3_past, 1, tau, h, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
+        [A3, b3] = getSysMat(u3_past, 1, tau, h3, s3(n+1), s2(n+1), ds3dt, ds2dt, ...
            alpha(5:6, :), g4(time), g5(time));
         %u3 = A \ b;
-        u3 = solveWithBackslash(A, b);
+        u3 = solveWithBackslash(A3, b3);
         %u3 = solveWithThomas(A, b);
     end
     
@@ -217,14 +244,14 @@ while time <= tMax
         end
         
         % Вычисление толщины новой фазы
-        x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
+        x = s1(n+1) + ksi2.*(s2(n+1) - s1(n+1));
         dl = c2*rho2/qf/rho1*trapz(x(id:end), abs(u2(id:end) - Uf)*U0);
         
         if dl >= dlMin
             s2(n+1) = s3(n+1) - dl;
-            u3 = ones(Np, 1)*Uf;
+            u3 = ones(Np3, 1)*Uf;
             u2(id:end) = Uf;
-            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
+            u2 = interp1(x, u2, s1(n+1) + ksi2.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isUpperPhase = true;
         end
        
@@ -242,14 +269,14 @@ while time <= tMax
         end
         
         % Вычисление толщины новой фазы
-        x = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
+        x = s1(n+1) + ksi2.*(s2(n+1) - s1(n+1));
         dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(u2(1:id) - Uf)*U0);
         
         if dl >= dlMin
             s1(n+1) = s0(n+1) + dl;
-            u1 = ones(Np, 1)*Uf;
+            u1 = ones(Np1, 1)*Uf;
             u2(1:id) = Uf;
-            u2 = interp1(x, u2, s1(n+1) + ksi.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
+            u2 = interp1(x, u2, s1(n+1) + ksi2.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isLowerPhase = true;
         end
     end
@@ -271,9 +298,9 @@ while time <= tMax
         saveTime = saveTime + tau_save;
         saveId = saveId + 1;
         
-        x1 = s0(n+1) + ksi.*(s1(n+1) - s0(n+1));
-        x2 = s1(n+1) + ksi.*(s2(n+1) - s1(n+1));
-        x3 = s2(n+1) + ksi.*(s3(n+1) - s2(n+1));
+        x1 = s0(n+1) + ksi1.*(s1(n+1) - s0(n+1));
+        x2 = s1(n+1) + ksi2.*(s2(n+1) - s1(n+1));
+        x3 = s2(n+1) + ksi3.*(s3(n+1) - s2(n+1));
         if isLowerPhase
             x1q = s0(n+1) + ksi_save.*(s1(n+1) - s0(n+1));
             u1q = interp1(x1, u1, x1q, 'linear', 'extrap');
