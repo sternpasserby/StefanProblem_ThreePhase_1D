@@ -21,9 +21,13 @@ accumRate = ic.accumRate;
 
 % Задание числа узлов на каждую фазу
 Np_min = 100;
+Np_max = 10000;
 Np1 = max(Np_min, ceil((ic.s1 - ic.s0)/h) );
 Np2 = max(Np_min, ceil((ic.s2 - ic.s1)/h) );
 Np3 = max(Np_min, ceil((ic.s3 - ic.s2)/h) );
+Np1 = min(Np_max, Np1);
+Np2 = min(Np_max, Np2);
+Np3 = min(Np_max, Np3);
 h1 = 1/(Np1 - 1);
 h2 = 1/(Np2 - 1);
 h3 = 1/(Np3 - 1);
@@ -193,8 +197,11 @@ while time <= tMax
     end
     time = time + tau;
     
+    Uf_adj = (273.15 - 7.43*1e-8*rho2*9.81*( s2(n+1)-s1(n+1) )*x0)/U0;
+    
     % Получение распределения тепла для первой фазы (если она есть)
     if isLowerPhase
+        g1 = @(t)( Uf_adj );
         [A1, b1] = getSysMat(u1_past, 1, tau, h1, s1(n+1), s0(n+1), ds1dt, ds0dt, ...
            alpha(1:2, :), g0(time), g1(time));
         %u1 = A \ b;
@@ -212,6 +219,7 @@ while time <= tMax
     end
     if isLowerPhase
         alphaLower = alpha(3, :);
+        g2 = @(t)( Uf_adj );
         gLower = g2;
     else
         alphaLower = alpha(1, :);
@@ -258,11 +266,11 @@ while time <= tMax
     end
     
     % Зарождение нижней фазы
-    if u2(1) > Uf && u2(2) > Uf && ~isLowerPhase
+    if u2(1) > Uf_adj && u2(2) > Uf_adj && ~isLowerPhase
         % Поиск номера последнего узла, который должен быть водой
         id = 1;
         for i = 1:length(u2)
-            if u2(i) < Uf
+            if u2(i) < Uf_adj
                 id = i - 1;
                 break;
             end
@@ -270,12 +278,12 @@ while time <= tMax
         
         % Вычисление толщины новой фазы
         x = s1(n+1) + ksi2.*(s2(n+1) - s1(n+1));
-        dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(u2(1:id) - Uf)*U0);
+        dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(u2(1:id) - Uf_adj)*U0);
         
         if dl >= dlMin
             s1(n+1) = s0(n+1) + dl;
-            u1 = ones(Np1, 1)*Uf;
-            u2(1:id) = Uf;
+            u1 = ones(Np1, 1)*Uf_adj;
+            u2(1:id) = Uf_adj;
             u2 = interp1(x, u2, s1(n+1) + ksi2.*(s2(n+1) - s1(n+1)), 'linear', 'extrap');
             isLowerPhase = true;
         end
