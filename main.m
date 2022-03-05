@@ -1,46 +1,21 @@
 clear; close all;
 
 %%% Физические константы
-pc = struct;                  % pc - problem constants, константы задачи
-pc.lambda1 = 0.6;             % Коэффициент теплопроводности воды, Вт / (м * K)
-pc.c1 = 4180.6;               % Коэффициеент удельной теплоёмкости воды, Дж / (кг * К)
-pc.rho1 = 1000;               % Плотность воды, кг/м^3
-pc.a1_sq = pc.lambda1/...     % Коэффициент температуропроводности воды, м^2/с
-    pc.c1/pc.rho1;            
-pc.lambda2 = 2.33;            % Коэффициент теплопроводности льда, Вт / (м * K)
-pc.c2 = 2110.0;               % Коэффициеент удельной теплоёмкости льда, Дж / (кг * К)
-pc.rho2 = 916.7;              % Плотность льда, кг/м^3
-pc.a2_sq = pc.lambda2/...     % Коэффициент температуропроводности льда, м^2/с
-    pc.c2/pc.rho2;            
-pc.qf = 330*1e3;              % Удельная теплота плавления льда, Дж / кг
-%pc.rho = (rho1 + rho2)/2;     % Средняя плотность
-%pc.L = 1;                     % Длина стержня, м
-pc.Uf = 273.15;               % Температура фазового перехода, К
+pc = getPhysicalConstants("RealLife");
 
 %%% Смешанные краевые условия
 % Формат краевых условий:
 % alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
 % alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
 bc = struct;                  % bc - boundary conditions
-bc.alpha = zeros(6, 2);
-bc.alpha = [0 -pc.lambda1; 
-            1 0
-            1 0
-            1 0
-            1 0
-            1 0];
+bc.alpha = zeros(2);
+bc.alpha = [0 -pc.lambda1; 1 0];
 bc.g0 = @(t)(0.05);
-bc.g1 = @(t)(pc.Uf);
-bc.g2 = @(t)(pc.Uf);
-bc.g3 = @(t)(pc.Uf);
-bc.g4 = @(t)(pc.Uf);
-bc.g5 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
-%bc.g5 = @(t)(1 + 273.15);
+bc.g1 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
 
 %%% Параметры численного решения
 Np = 1000;            % Число узлов сетки для каждой фазы
 tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-%tMax = 100*24*3600;
 tau = 3600*24*14;     % Шаг по времени, с
 tauSave = 3600*24*365.25/4;
 
@@ -51,26 +26,13 @@ ic.s0 = 820;
 ic.s1 = 3310 - 2490;
 ic.s2 = 3310;
 ic.s3 = 3310;
-ic.accumRate = 85.577331466675;
+%ic.accumRate = 85.577331466675;
 bc.g0 = @(t)(52.621367149353/1000);
-% ic = struct;                 % ic - initial conditions
-% ic.s0 = 0;            % Начальные положения границы раздела сред, м
-% ic.s1 = 0;
-% ic.s2 = 9;
-% ic.s3 = 10;
-% ic.accumRate = 500;    % Скорость аккумуляции, кг/(м^2*год)
 ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 2;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-% ic.s0 = -800;
-% ic.s1 = -800;
-% ic.s2 = 1407;
-% ic.s3 = 1408;
-% GHF = 75.7157;
-% bc.g0 =  @(t)(GHF/1000);
-
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 0.05, tau, tMax, 10000, tauSave);
+[s, t, U, X, T] = StefanProblemSolver(pc, bc);
 % plot(s', '.')
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 % subplot(5, 1, [2 5]);
@@ -163,3 +125,38 @@ set(gca, 'FontSize', 20)
 % lg = legend("$s_2(t)$");
 % lg.Interpreter = 'latex';
 
+function pc = getPhysicalConstants(type)
+    switch type
+        case 'RealLife'
+            %%% Физические константы
+            pc = struct;                  % pc - problem constants, константы задачи
+            pc.lambda1 = 0.6;             % Коэффициент теплопроводности воды, Вт / (м * K)
+            pc.c1 = 4180.6;               % Коэффициеент удельной теплоёмкости воды, Дж / (кг * К)
+            pc.rho1 = 1000;               % Плотность воды, кг/м^3
+            pc.a1_sq = pc.lambda1/...     % Коэффициент температуропроводности воды, м^2/с
+                pc.c1/pc.rho1;            
+            pc.lambda2 = 2.33;            % Коэффициент теплопроводности льда, Вт / (м * K)
+            pc.c2 = 2110.0;               % Коэффициеент удельной теплоёмкости льда, Дж / (кг * К)
+            pc.rho2 = 916.7;              % Плотность льда, кг/м^3
+            pc.a2_sq = pc.lambda2/...     % Коэффициент температуропроводности льда, м^2/с
+                pc.c2/pc.rho2;            
+            pc.qf = 330*1e3;              % Удельная теплота плавления льда, Дж / кг
+            pc.Uf = 273.15;               % Температура фазового перехода, К
+        case 'AllOnes'
+            pc = struct;
+            pc.lambda1 = 1;
+            pc.c1 = 1;
+            pc.rho1 = 1;
+            pc.a1_sq = 1;         
+            pc.lambda2 = 1;
+            pc.c2 = 1;
+            pc.rho2 = 1;
+            pc.a2_sq = 1;          
+            pc.qf = 1;
+            pc.Uf = 1;
+        otherwise
+            error(sprintf("Type %s is invalid.\nExpected type to match one of these values: %s, %s\n", ...
+                type, "RealLife", "AllOnes"));
+    end
+    
+end
