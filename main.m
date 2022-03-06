@@ -8,7 +8,6 @@ pc = getPhysicalConstants("RealLife");
 % alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
 % alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
 bc = struct;                  % bc - boundary conditions
-bc.alpha = zeros(2);
 bc.alpha = [0 -pc.lambda1; 1 0];
 bc.g0 = @(t)(0.05);
 bc.g1 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
@@ -32,7 +31,7 @@ ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 2;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[s, t, U, X, T] = StefanProblemSolver(pc, bc);
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, 'tau', 3600*24*30, 'tMax', 10*365.25*24*3600);
 % plot(s', '.')
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 % subplot(5, 1, [2 5]);
@@ -61,15 +60,15 @@ subplot(2, 1, 1)
 plot(t/3600/24, s, 'LineWidth', 2)
 xlabel("t, days")
 ylabel("X, meters")
-axis([-inf inf s(4, 1) s(4, end)])
+axis([-inf inf min(s(4, :)) max(s(4, :))])
 title("Координата поверхности ледника")
 set(gca, 'FontSize', 20)
 subplot(2, 1, 2)
 plot(t/3600/24, s, 'LineWidth', 2)
 xlabel("t, days")
 ylabel("X, meters")
-axis([-inf inf s(2, 1) s(2, end)])
-title("Координата поверхности ледника")
+axis([-inf inf min(s(2, :)) max(s(2, :))])
+title("Координата нижней кромки ледника")
 set(gca, 'FontSize', 20)
 
 % figure

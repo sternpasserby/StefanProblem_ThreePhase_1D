@@ -6,14 +6,15 @@ function [s, t, U, X, T] = StefanProblemSolver(pc, bc, varargin)
 
 %%% ПАРСИНГ ВХОДНЫХ ПАРАМЕТРОВ
 % Задание значений входных параметров по умолчанию
+defaultNp = [100 10000 100];
 defaultIc = struct('s', [-130; -129; 1100; 1100], ...
                    'dsdt', zeros(4, 1), ...
-                   'x1', linspace(-130, -129, 100), ...
-                   'u1', 273.15 + zeros(100, 1), ...
-                   'x2', linspace(-129, 1100, 1000), ...
-                   'u2', 273.15 - 2*ones(1000, 1), ...
-                   'x3', ones(100, 1)*1100, ...
-                   'u3', 273.15 + ones(100, 1), ...
+                   'x1', linspace(-130, -129, defaultNp(1)), ...
+                   'u1', 273.15 + zeros(defaultNp(1), 1), ...
+                   'x2', linspace(-129, 1100, defaultNp(2)), ...
+                   'u2', 273.15 - 2*ones(defaultNp(2), 1), ...
+                   'x3', ones(defaultNp(3), 1)*1100, ...
+                   'u3', 273.15 + ones(defaultNp(3), 1), ...
                    'tInit', 0);
 defaultAccumRate = 85.5;
 defaultTau = 3600*24*14;
@@ -216,12 +217,6 @@ while time <= tMax
     ph2.s(n+1) = ph2.s(n) + tau*ph2.dsdt;
     ph3.s(n+1) = ph3.s(n) + tau*ph3.dsdt;
     
-    if (abs( ph2.s(n+1)-ph2.s(n) ) > minDs && ph2.exists) || ...
-            (abs( ph1.s(n+1)-ph1.s(n) ) > minDs && ph1.exists)
-        tau = tau/2;
-        continue;
-    end
-    
     %fprintf("%10.4e %10.4e %10.4e %10.4e\n", tau, ph1.dsdt, ph2.dsdt, ph3.dsdt);
     
     if ~ph3.exists
@@ -231,6 +226,12 @@ while time <= tMax
     if ~ph1.exists
         ph1.s(n+1) = s0;
         ph1.dsdt = 0;
+    end
+    
+    if (abs( ph2.s(n+1)-ph2.s(n) ) > minDs && ph2.exists) || ...
+            (abs( ph1.s(n+1)-ph1.s(n) ) > minDs && ph1.exists)
+        tau = tau/2;
+        continue;
     end
     
     % Вырождение верхней и нижней фаз
@@ -312,21 +313,21 @@ while time <= tMax
         % Поиск номера последнего узла, который должен быть водой
         id = 1;
         for i = 1:Np(2)
-            if pf2.u(i) < Uf_adj
+            if ph2.u(i) < Uf_adj
                 id = i - 1;
                 break;
             end
         end
         
         % Вычисление толщины новой фазы
-        x = ps1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1));
+        x = ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1));
         dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj)*U0);
         
         if dl >= minNewPhaseThickness
             ph1.s(n+1) = s0 + dl;
             ph1.u = ones(Np(1), 1)*Uf_adj;
             ph2.u(1:id) = Uf_adj;
-            ph2.u = interp1(x, ph2.u, ph1.s1(n+1) + ph2.ksi.*(ph2.s2(n+1) - ph1.s1(n+1)), 'linear', 'extrap')';
+            ph2.u = interp1(x, ph2.u, ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1)), 'linear', 'extrap')';
             ph1.exists = true;
         end
     end
@@ -339,7 +340,16 @@ while time <= tMax
     % Аккумуляция
     dL = accumRate/(365.25*24*3600)*tau*t0/rho2/x0;
     ph2.s(n+1) = ph2.s(n+1) + dL;
-    ph3.s(n+1) = ph2.s(n+1) + dL;
+    ph3.s(n+1) = ph3.s(n+1) + dL;
+    
+%     x1 = s0 + ph1.ksi*( ph1.s(n+1) - s0 );
+%     x2 = ph1.s(n+1) + ph2.ksi*( ph2.s(n+1) - ph1.s(n+1) );
+%     x3 = ph2.s(n+1) + ph3.ksi*( ph3.s(n+1) - ph2.s(n+1) );
+%     plot(x1*x0, ( ph1.u - 1 )*U0)
+%     hold on
+%     plot(x2*x0, ( ph2.u - 1 )*U0)
+%     plot(x3*x0, ( ph3.u - 1 )*U0)
+%     hold off
     
     % Запись результатов
     t(n + 1) = time;
@@ -392,36 +402,40 @@ fprintf("Elapsed time for Stefan Problem Solver: %4.2f sec.\n", elapsedTime);
 end
 
 function xNew = getGrid(Np)
-    X = [0 1/4 3/4 1];
-    H = 0.1;
-    ppF = struct();
-    ppF.form = 'pp';
-    ppF.breaks = X;
-    c1 = ( (1-H)/3 + H )*(X(2)-X(1));
-    ppF.coefs = [ (1-H)/3/(X(2)-X(1))^2 (H-1)/(X(2)-X(1)) 1 0; ...
-                   0 0 H c1; ...
-                   (1-H)/3/(X(4)-X(3))^2 0 H c1 + H*(X(3)-X(2))];
-    ppF.pieces = 3;
-    ppF.order = 4;
-    ppF.dim = 1;
-    
-    der_ppF = fnder(ppF, 1);
-    
-    y = linspace( ppval(ppF, 0), ppval(ppF, 1), Np );
     xNew = linspace(0, 1, Np);
-    for i = 1:10
-        xNew = xNew - (ppval(ppF, xNew)-y)./(ppval(der_ppF, xNew));
-        %fprintf("Error: %6.2e\n", max(abs(xNew-temp)));
-        %temp = xNew;
-    end
-    
-    if ~issorted(xNew)
-        error("xNew is not monotonically increasing!")
-    end
-    if ~all(xNew >= 0 & xNew <= 1)
-        error("Some of xNew elements lie outside of [0, 1] domain!");
-    end
 end
+
+% function xNew = getGrid(Np)
+%     X = [0 1/4 3/4 1];
+%     H = 0.1;
+%     ppF = struct();
+%     ppF.form = 'pp';
+%     ppF.breaks = X;
+%     c1 = ( (1-H)/3 + H )*(X(2)-X(1));
+%     ppF.coefs = [ (1-H)/3/(X(2)-X(1))^2 (H-1)/(X(2)-X(1)) 1 0; ...
+%                    0 0 H c1; ...
+%                    (1-H)/3/(X(4)-X(3))^2 0 H c1 + H*(X(3)-X(2))];
+%     ppF.pieces = 3;
+%     ppF.order = 4;
+%     ppF.dim = 1;
+%     
+%     der_ppF = fnder(ppF, 1);
+%     
+%     y = linspace( ppval(ppF, 0), ppval(ppF, 1), Np );
+%     xNew = linspace(0, 1, Np);
+%     for i = 1:10
+%         xNew = xNew - (ppval(ppF, xNew)-y)./(ppval(der_ppF, xNew));
+%         %fprintf("Error: %6.2e\n", max(abs(xNew-temp)));
+%         %temp = xNew;
+%     end
+%     
+%     if ~issorted(xNew)
+%         error("xNew is not monotonically increasing!")
+%     end
+%     if ~all(xNew >= 0 & xNew <= 1)
+%         error("Some of xNew elements lie outside of [0, 1] domain!");
+%     end
+% end
 
 function yNew = csInterp(x, y, xq, alpha, g0, g1)
     conds = [1 1];
