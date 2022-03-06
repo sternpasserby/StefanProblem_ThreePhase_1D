@@ -186,6 +186,7 @@ time = tInit;
 tau0 = tau;     % Шаг по времени, заданный пользователем
 n = 1;
 
+clear printProgressBar;
 tic;
 while time <= tMax
     u1_past = ph1.u;
@@ -354,7 +355,8 @@ while time <= tMax
     % Запись результатов
     t(n + 1) = time;
     if (saveTime < time)
-        fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
+        %fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
+        printProgressBar(saveTime, tMax);
         saveTime = saveTime + tauSave;
         saveId = saveId + 1;
         
@@ -401,41 +403,41 @@ elapsedTime = toc;
 fprintf("Elapsed time for Stefan Problem Solver: %4.2f sec.\n", elapsedTime);
 end
 
-function xNew = getGrid(Np)
-    xNew = linspace(0, 1, Np);
-end
-
 % function xNew = getGrid(Np)
-%     X = [0 1/4 3/4 1];
-%     H = 0.1;
-%     ppF = struct();
-%     ppF.form = 'pp';
-%     ppF.breaks = X;
-%     c1 = ( (1-H)/3 + H )*(X(2)-X(1));
-%     ppF.coefs = [ (1-H)/3/(X(2)-X(1))^2 (H-1)/(X(2)-X(1)) 1 0; ...
-%                    0 0 H c1; ...
-%                    (1-H)/3/(X(4)-X(3))^2 0 H c1 + H*(X(3)-X(2))];
-%     ppF.pieces = 3;
-%     ppF.order = 4;
-%     ppF.dim = 1;
-%     
-%     der_ppF = fnder(ppF, 1);
-%     
-%     y = linspace( ppval(ppF, 0), ppval(ppF, 1), Np );
 %     xNew = linspace(0, 1, Np);
-%     for i = 1:10
-%         xNew = xNew - (ppval(ppF, xNew)-y)./(ppval(der_ppF, xNew));
-%         %fprintf("Error: %6.2e\n", max(abs(xNew-temp)));
-%         %temp = xNew;
-%     end
-%     
-%     if ~issorted(xNew)
-%         error("xNew is not monotonically increasing!")
-%     end
-%     if ~all(xNew >= 0 & xNew <= 1)
-%         error("Some of xNew elements lie outside of [0, 1] domain!");
-%     end
 % end
+
+function xNew = getGrid(Np)
+    X = [0 1/4 3/4 1];
+    H = 0.1;
+    ppF = struct();
+    ppF.form = 'pp';
+    ppF.breaks = X;
+    c1 = ( (1-H)/3 + H )*(X(2)-X(1));
+    ppF.coefs = [ (1-H)/3/(X(2)-X(1))^2 (H-1)/(X(2)-X(1)) 1 0; ...
+                   0 0 H c1; ...
+                   (1-H)/3/(X(4)-X(3))^2 0 H c1 + H*(X(3)-X(2))];
+    ppF.pieces = 3;
+    ppF.order = 4;
+    ppF.dim = 1;
+    
+    der_ppF = fnder(ppF, 1);
+    
+    y = linspace( ppval(ppF, 0), ppval(ppF, 1), Np );
+    xNew = linspace(0, 1, Np);
+    for i = 1:10
+        xNew = xNew - (ppval(ppF, xNew)-y)./(ppval(der_ppF, xNew));
+        %fprintf("Error: %6.2e\n", max(abs(xNew-temp)));
+        %temp = xNew;
+    end
+    
+    if ~issorted(xNew)
+        error("xNew is not monotonically increasing!")
+    end
+    if ~all(xNew >= 0 & xNew <= 1)
+        error("Some of xNew elements lie outside of [0, 1] domain!");
+    end
+end
 
 function yNew = csInterp(x, y, xq, alpha, g0, g1)
     conds = [1 1];
@@ -456,3 +458,42 @@ function yNew = csInterp(x, y, xq, alpha, g0, g1)
     pp = csape(x, [C0; y; C1]', conds);
     yNew = ppval(pp, xq)';
 end
+
+function printProgressBar(n, N)
+%PRINTPROGRESSBAR Summary of this function goes here
+%   Detailed explanation goes here
+
+persistent barLength;
+persistent leftSymbol;
+persistent rightSymbol;
+persistent completedSymbol;
+persistent todoSymbol;
+persistent reverseStr;
+
+fraction = n/N;
+isInit = (isempty(reverseStr) && fraction <= 1);
+if isInit
+          barLength = 25;
+         leftSymbol = '[';
+        rightSymbol = ']';
+    completedSymbol = '=';
+         todoSymbol = ' ';
+         reverseStr = '';
+end
+
+numOfSegments = floor(fraction*barLength);
+completedStr = repmat(completedSymbol, 1, numOfSegments);
+todoStr = repmat(todoSymbol, 1, barLength - numOfSegments);
+%msg = sprintf([leftSymbol completedStr todoStr  rightSymbol ' %5.2f%% (%d / %d)'], fraction*100, n, N);
+msg = sprintf(...
+    [leftSymbol ... 
+    completedStr ... 
+    todoStr ... 
+    rightSymbol, ...
+    ' %5.2f%%'], fraction*100);
+    %' %5.2f%% (%d/%d)'], fraction*100, n, N);
+disp([reverseStr msg]);
+reverseStr = repmat(sprintf('\b'), 1, length(msg)+1);
+end
+
+
