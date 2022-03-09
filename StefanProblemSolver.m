@@ -1,4 +1,4 @@
-function [s, t, U, X, T] = StefanProblemSolver(pc, bc, varargin)
+function [S, t, U, X, T] = StefanProblemSolver(pc, bc, varargin)
 %STEFANPROBLEMSOLVER Решатель трехфазной задачи Стефана
 %   На вход подаются 3 структуры, число узлов сетки для каждой фазы Np,
 %   размер временнОго шага tau и время моделирования tMax. Возвращает 3
@@ -33,6 +33,7 @@ parserObj.StructExpand = false;
 addRequired(parserObj, 'pc');
 addRequired(parserObj, 'bc');
 addOptional(parserObj, 'ic', defaultIc);
+addParameter(parserObj, 'Np', defaultNp);
 addParameter(parserObj, 'accumRate', defaultAccumRate);
 addParameter(parserObj, 'tau', defaultTau);
 addParameter(parserObj, 'tMax', defaultTMax);
@@ -60,16 +61,17 @@ rho = (rho1 + rho2)/2;
 
 % Получение значений параметров от объекта parserObj типа InputParser
 parse(parserObj, pc, bc, varargin{:});
-accumRate = parserObj.Results.accumRate;
-ic = parserObj.Results.ic;
-tau = parserObj.Results.tau;
-tMax = parserObj.Results.tMax;
-x0 = parserObj.Results.chLength;
-U0 = parserObj.Results.chTemperature;
-gridType = parserObj.Results.gridType;
-NpSave = parserObj.Results.NpSave;
-tauSave = parserObj.Results.tauSave;
-minDs = parserObj.Results.minDs;
+           accumRate = parserObj.Results.accumRate;
+                  ic = parserObj.Results.ic;
+                  Np = parserObj.Results.Np;
+                 tau = parserObj.Results.tau;
+                tMax = parserObj.Results.tMax;
+                  x0 = parserObj.Results.chLength;
+                  U0 = parserObj.Results.chTemperature;
+            gridType = parserObj.Results.gridType;
+              NpSave = parserObj.Results.NpSave;
+             tauSave = parserObj.Results.tauSave;
+               minDs = parserObj.Results.minDs;
 minNewPhaseThickness = parserObj.Results.minNewPhaseThickness;
          
 % Вычисление безразмерных параметров
@@ -83,9 +85,7 @@ g1 = @(t)(bc.g1(t*t0)/U0);
 u1 = ic.u1/U0;
 u2 = ic.u2/U0;
 u3 = ic.u3/U0;
-% x1 = ic.x1/x0;
-% x2 = ic.x2/x0;
-% x3 = ic.x3/x0;
+s = ic.s/x0;
 tInit = ic.tInit/t0;
 tau = tau/t0;
 tauSave = tauSave/t0;
@@ -97,7 +97,6 @@ minNewPhaseThickness = minNewPhaseThickness/x0;
 s0 = ic.s(1)/x0;
 
 numOfTimeSteps = ceil(tMax/tau);
-Np = [length(u1) length(u2) length(u3)];
 ksiNew = getGrid(Np(1));
 if ~(ic.s(1)==ic.s(2))
     ksi = ( ic.x1 - ic.s(1) ) ./ ( ic.s(2) - ic.s(1) );
@@ -109,22 +108,26 @@ else
 end
 ph1 = struct('ksi', ksiNew, ...
              'u', u1, ...
-             's', zeros(1, numOfTimeSteps + 1), ...
+             'uPast', u1, ...
+             's', s(2), ...
+             'sPast', s(2), ...
              'dsdt', 0, ...
              'exists', ~(ic.s(1)==ic.s(2)) );
-ph1.s(1) = ic.s(2)/x0;
-ksi = ( ic.x2 - ic.s(2) ) ./ ( ic.s(3) - ic.s(2) );
+%ph1.s(1) = ic.s(2)/x0;
 ksiNew = getGrid(Np(2));
+ksi = ( ic.x2 - ic.s(2) ) ./ ( ic.s(3) - ic.s(2) );
+u2 = interp1(ksi, u2, ksiNew, 'linear', 'extrap')';
 ph2 = struct('ksi', ksiNew, ...
-             'u', interp1(ksi, u2, ksiNew, 'linear', 'extrap')', ... %'u', csInterp(ksi, u2, ksiNew, [1 0; 1 0], Uf, Uf), ...
-             's', zeros(1, numOfTimeSteps + 1), ...
+             'u', u2, ... %'u', csInterp(ksi, u2, ksiNew, [1 0; 1 0], Uf, Uf), ...
+             'uPast', u2, ...
+             's', s(3), ...
+             'sPast', s(3), ...
              'dsdt', 0, ...
              'exists', true );
-ph2.s(1) = ic.s(3)/x0;
-ksi = ( ic.x3 - ic.s(3) ) ./ ( ic.s(4) - ic.s(3) );
+%ph2.s(1) = ic.s(3)/x0;
 ksiNew = getGrid(Np(3));
 if ~(ic.s(3)==ic.s(4))
-    ksi = ( ic.x1 - ic.s(1) ) ./ ( ic.s(2) - ic.s(1) );
+    ksi = ( ic.x3 - ic.s(3) ) ./ ( ic.s(4) - ic.s(3) );
     %u3 = csInterp(ksi, u3, ksiNew, [1 0; alpha(2, :)], Uf, g1(tInit));
     u3 = interp1(ksi, u3, ksiNew, 'linear', 'extrap')';
 else
@@ -133,12 +136,15 @@ else
 end
 ph3 = struct('ksi', ksiNew, ...
              'u', u3, ...
-             's', zeros(1, numOfTimeSteps + 1), ...
+             'uPast', u3, ...
+             's', s(4), ...
+             'sPast', s(4), ...
              'dsdt', 0, ...
              'exists', ~(ic.s(3)==ic.s(4)) );
-ph3.s(1) = ic.s(4)/x0;
+%ph3.s(1) = ic.s(4)/x0;
 
 t = zeros(1, numOfTimeSteps + 1);
+S = zeros(4, numOfTimeSteps + 1);
 
 nRows = sum(NpSave);
 nCols = min(numOfTimeSteps, ceil(tMax/tauSave) ) + 1;
@@ -158,7 +164,7 @@ ksiSave1 = getGrid(NpSave(1));
 if ph1.exists
     %u1q = csInterp(ph1.ksi, ph1.u, ksiSave1, [alpha(1, :); 1 0], g0(tInit), Uf);
     u1q = interp1(ph1.ksi, ph1.u, ksiSave1, 'linear', 'extrap')';
-    x1q = s0 + ksiSave1*( ph1.s(1) - s0 );
+    x1q = s(1) + ksiSave1*( ph1.s(1) - s(1) );
 else
     x1q = ksiSave1.*NaN;
     u1q = ksiSave1'.*NaN;
@@ -178,81 +184,87 @@ else
 end
 U(:, 1) = [u1q; u2q; u3q];
 X(:, 1) = [x1q'; x2q'; x3q'];
+S(:, 1) = s';
+t(1) = tInit;
 
 saveTime = tauSave;
-saveId = 1;
+saveId = 2;
 
 time = tInit;
 tau0 = tau;     % Шаг по времени, заданный пользователем
-n = 1;
+n = 2;
 
 clear printProgressBar;
 tic;
-while time <= tMax
-    u1_past = ph1.u;
-    u2_past = ph2.u;
-    u3_past = ph3.u;
+%while time <= tMax
+while n <= numOfTimeSteps + 1
+    ph1.uPast = ph1.u;
+    ph2.uPast = ph2.u;
+    ph3.uPast = ph3.u;
+    ph1.sPast = ph1.s;
+    ph2.sPast = ph2.s;
+    ph3.sPast = ph3.s;
     
     % Вычисление скоростей движения границ
-    C1 = 1/beta/( ph1.s(n) - s0 );
-    C2 = lambda2/(lambda1*beta*( ph2.s(n) - ph1.s(n) ));
-    C3 = 1/beta/( ph3.s(n) - ph2.s(n) );
+    C1 = 1/beta/( ph1.s - s0 );
+    C2 = lambda2/(lambda1*beta*( ph2.s - ph1.s ));
+    C3 = 1/beta/( ph3.s - ph2.s );
     h0 = ph2.ksi(2) - ph2.ksi(1);
     h1 = ph2.ksi(3) - ph2.ksi(2);
     h_Npm1 = ph1.ksi( Np(1) ) - ph1.ksi( Np(1)-1 );
     h_Npm2 = ph1.ksi( Np(1)-1 ) - ph1.ksi( Np(1)-2 );
-    ph1.dsdt = C2/( h0*h1*(h0+h1) )*( ( u2_past(2) - u2_past(1) )*(h0+h1)^2 - (u2_past(3)-u2_past(1))*h0^2 ) - ...
+    ph1.dsdt = C2/( h0*h1*(h0+h1) )*( ( ph2.uPast(2) - ph2.uPast(1) )*(h0+h1)^2 - (ph2.uPast(3)-ph2.uPast(1))*h0^2 ) - ...
         C1/( h_Npm1*h_Npm2*(h_Npm1+h_Npm2) )*...
-        ( ( u1_past(Np(1)) - u1_past(Np(1)-1) )*(h_Npm2+h_Npm1)^2 + (u1_past(Np(1)-2) - u1_past(Np(1)))*h_Npm1^2 );
+        ( ( ph1.uPast(Np(1)) - ph1.uPast(Np(1)-1) )*(h_Npm2+h_Npm1)^2 + (ph1.uPast(Np(1)-2) - ph1.uPast(Np(1)))*h_Npm1^2 );
     h_Npm1 = ph2.ksi( Np(2) ) - ph2.ksi( Np(2)-1 );
     h_Npm2 = ph2.ksi( Np(2)-1 ) - ph2.ksi( Np(2)-2 );
     h0 = ph3.ksi(2) - ph3.ksi(1);
     h1 = ph3.ksi(3) - ph3.ksi(2);
     ph2.dsdt = C2/( h_Npm1*h_Npm2*(h_Npm1+h_Npm2) )*...
-        ( ( u2_past(Np(2)) - u2_past(Np(2)-1) )*(h_Npm2+h_Npm1)^2 + (u2_past(Np(2)-2)-u2_past(Np(2)))*h_Npm1^2 ) - ...
-        C3/( h0*h1*(h0+h1) )*( ( u3_past(2) - u3_past(1) )*(h0+h1)^2 - (u3_past(3)-u3_past(1))*h0^2 );
+        ( ( ph2.uPast(Np(2)) - ph2.uPast(Np(2)-1) )*(h_Npm2+h_Npm1)^2 + (ph2.uPast(Np(2)-2)-ph2.uPast(Np(2)))*h_Npm1^2 ) - ...
+        C3/( h0*h1*(h0+h1) )*( ( ph3.uPast(2) - ph3.uPast(1) )*(h0+h1)^2 - (ph3.uPast(3)-ph3.uPast(1))*h0^2 );
     ph3.dsdt = 0;
     
-    % Интегрирование уравнений движения границ
-    ph1.s(n+1) = ph1.s(n) + tau*ph1.dsdt;
-    ph2.s(n+1) = ph2.s(n) + tau*ph2.dsdt;
-    ph3.s(n+1) = ph3.s(n) + tau*ph3.dsdt;
-    
-    %fprintf("%10.4e %10.4e %10.4e %10.4e\n", tau, ph1.dsdt, ph2.dsdt, ph3.dsdt);
-    
     if ~ph3.exists
-        ph2.s(n+1) = ph3.s(n+1);
+        ph2.s = ph3.s;
         ph2.dsdt = ph3.dsdt;
     end
     if ~ph1.exists
-        ph1.s(n+1) = s0;
+        ph1.s = s0;
         ph1.dsdt = 0;
     end
     
-    if (abs( ph2.s(n+1)-ph2.s(n) ) > minDs && ph2.exists) || ...
-            (abs( ph1.s(n+1)-ph1.s(n) ) > minDs && ph1.exists)
+    %fprintf("%10.4e %10.4e %10.4e %10.4e\n", tau, ph1.dsdt, ph2.dsdt, ph3.dsdt);
+    
+    if (abs( tau*ph2.dsdt ) > minDs && ph2.exists) || ...
+            (abs( tau*ph3.dsdt ) > minDs && ph1.exists)
         tau = tau/2;
         continue;
     end
     
+    % Интегрирование уравнений движения границ
+    ph1.s = ph1.sPast + tau*ph1.dsdt;
+    ph2.s = ph2.sPast + tau*ph2.dsdt;
+    ph3.s = ph3.sPast + tau*ph3.dsdt;
+    
     % Вырождение верхней и нижней фаз
-    if ph2.s(n+1) >= ph3.s(n+1) && ph3.exists
-        ph2.s(n+1) = ph3.s(n+1);
+    if ph2.s >= ph3.s && ph3.exists
+        ph2.s = ph3.s;
         ph2.dsdt = ph3.dsdt;
         ph3.exists = false;
     end
-    if ph1.s(n+1) <= s0 && ph1.exists
-        ph1.s(n+1) = s0;
+    if ph1.s <= s0 && ph1.exists
+        ph1.s = s0;
         ph1.dsdt = 0;
         ph1.exists = false;
     end
     time = time + tau;
     
-    Uf_adj = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s(n+1)-ph1.s(n+1) )*x0)/U0;
+    Uf_adj = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s - ph1.s )*x0)/U0;
     
     % Получение распределения тепла для первой фазы (если она есть)
     if ph1.exists
-        [A1, b1] = getSysMat(u1_past, 1, tau, ph1.ksi, ph1.s(n+1), s0, ph1.dsdt, 0, ...
+        [A1, b1] = getSysMat(ph1.uPast, 1, tau, ph1.ksi, ph1.s, s0, ph1.dsdt, 0, ...
            [alpha(1, :); 1 0], g0(time), Uf_adj);
         ph1.u = solveWithBackslash(A1, b1);
     end
@@ -272,13 +284,13 @@ while time <= tMax
         alphaLower = alpha(1, :);
         gLower = g0(time);
     end
-    [A2, b2] = getSysMat(u2_past, kappa, tau, ph2.ksi, ph2.s(n+1), ph1.s(n+1), ph2.dsdt, ph1.dsdt, ...
+    [A2, b2] = getSysMat(ph2.uPast, kappa, tau, ph2.ksi, ph2.s, ph1.s, ph2.dsdt, ph1.dsdt, ...
         [alphaLower; alphaUpper], gLower, gUpper);
     ph2.u = solveWithBackslash(A2, b2);
     
     % Получение распределения тепла для третьей фазы
     if ph3.exists
-        [A3, b3] = getSysMat(u3_past, 1, tau, ph3.ksi, ph3.s(n+1), ph2.s(n+1), ph3.dsdt, ph2.dsdt, ...
+        [A3, b3] = getSysMat(ph3.uPast, 1, tau, ph3.ksi, ph3.s, ph2.s, ph3.dsdt, ph2.dsdt, ...
            [1 0; alpha(2, :)], Uf, g1(time));
         ph3.u = solveWithBackslash(A3, b3);
     end
@@ -295,15 +307,15 @@ while time <= tMax
         end
         
         % Вычисление толщины новой фазы
-        x = ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1));
+        x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
         dl = c2*rho2/qf/rho1*trapz(x(id:end), abs(ph2.u(id:end) - Uf)*U0);
         
         if dl >= minNewPhaseThickness
-            ph2.s(n+1) = ph3.s(n+1) - dl;
+            ph2.s = ph3.s - dl;
             ph3.u = ones(Np(3), 1)*Uf;
             ph2.u(id:end) = Uf;
             %ph2.u = csInterp(x, ph2.u, ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1)), [1 0; 1 0], Uf_adj, Uf);
-            ph2.u = interp1(x, ph2.u, ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1)), 'linear', 'extrap')';
+            ph2.u = interp1(x, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
             ph3.exists = true;
         end
        
@@ -321,31 +333,31 @@ while time <= tMax
         end
         
         % Вычисление толщины новой фазы
-        x = ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1));
+        x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
         dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj)*U0);
         
         if dl >= minNewPhaseThickness
-            ph1.s(n+1) = s0 + dl;
+            ph1.s = s0 + dl;
             ph1.u = ones(Np(1), 1)*Uf_adj;
             ph2.u(1:id) = Uf_adj;
-            ph2.u = interp1(x, ph2.u, ph1.s(n+1) + ph2.ksi.*(ph2.s(n+1) - ph1.s(n+1)), 'linear', 'extrap')';
+            ph2.u = interp1(x, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
             ph1.exists = true;
         end
     end
     
     % Проседание льда из-за различной плотности льда и воды
-    dL = (ph1.s(n+1) - ph1.s(n) - (ph2.s(n+1) - ph2.s(n)) )*( 1 - rho1/rho2 );
-    ph2.s(n+1) = ph2.s(n+1) + dL;
-    ph3.s(n+1) = ph3.s(n+1) + dL;
+    dL = (ph1.s - ph1.sPast - (ph2.s - ph2.sPast) )*( 1 - rho1/rho2 );
+    ph2.s = ph2.s + dL;
+    ph3.s = ph3.s + dL;
     
     % Аккумуляция
     dL = accumRate/(365.25*24*3600)*tau*t0/rho2/x0;
-    ph2.s(n+1) = ph2.s(n+1) + dL;
-    ph3.s(n+1) = ph3.s(n+1) + dL;
+    ph2.s = ph2.s + dL;
+    ph3.s = ph3.s + dL;
     
-%     x1 = s0 + ph1.ksi*( ph1.s(n+1) - s0 );
-%     x2 = ph1.s(n+1) + ph2.ksi*( ph2.s(n+1) - ph1.s(n+1) );
-%     x3 = ph2.s(n+1) + ph3.ksi*( ph3.s(n+1) - ph2.s(n+1) );
+%     x1 = s0 + ph1.ksi*( ph1.s - s0 );
+%     x2 = ph1.s + ph2.ksi*( ph2.s - ph1.s );
+%     x3 = ph2.s + ph3.ksi*( ph3.s - ph2.s );
 %     plot(x1*x0, ( ph1.u - 1 )*U0)
 %     hold on
 %     plot(x2*x0, ( ph2.u - 1 )*U0)
@@ -353,18 +365,16 @@ while time <= tMax
 %     hold off
     
     % Запись результатов
-    t(n + 1) = time;
-    if (saveTime < time)
+    %t(n + 1) = time;
+    if (saveTime <= time)
         %fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
         printProgressBar(saveTime, tMax);
-        saveTime = saveTime + tauSave;
-        saveId = saveId + 1;
         
         %ksiSave1 = getGrid(NpSave(1));
         if ph1.exists
             %u1q = csInterp(ph1.ksi, ph1.u, ksiSave1, [alpha(1, :); 1 0], g0(time), Uf);
             u1q = interp1(ph1.ksi, ph1.u, ksiSave1, 'linear', 'extrap')';
-            x1q = s0 + ksiSave1*( ph1.s(1) - s0 );
+            x1q = s0 + ksiSave1*( ph1.s - s0 );
         else
             x1q = ksiSave1.*NaN;
             u1q = ksiSave1'.*NaN;
@@ -372,12 +382,12 @@ while time <= tMax
         ksiSave2 = getGrid(NpSave(2));
         %u2q = csInterp(ph2.ksi, ph2.u, ksiSave2, [1 0; 1 0], Uf, Uf);
         u2q = interp1(ph2.ksi, ph2.u, ksiSave2, 'linear', 'extrap')';
-        x2q = ph1.s(1) + ksiSave2*( ph2.s(1) - ph1.s(1) );
+        x2q = ph1.s + ksiSave2*( ph2.s - ph1.s );
         ksiSave3 = getGrid(NpSave(3));
         if ph3.exists
             %u3q = csInterp(ph3.ksi, ph3.u, ksiSave3, [1 0; alpha(2, :)], Uf, g1(time));
             u3q = interp1(ph3.ksi, ph3.u, ksiSave3, 'linear', 'extrap')';
-            x3q = ph2.s(1) + ksiSave3*( ph3.s(1) - ph2.s(1) );
+            x3q = ph2.s + ksiSave3*( ph3.s - ph2.s );
         else
             x3q = ksiSave3.*NaN;
             u3q = ksiSave3'.*NaN;
@@ -385,18 +395,27 @@ while time <= tMax
         U(:, saveId) = [u1q; u2q; u3q];
         X(:, saveId) = [x1q'; x2q'; x3q'];
         T(:, saveId) = ones(nRows, 1)*time;
+        
+        saveTime = saveTime + tauSave;
+        saveId = saveId + 1;
     end
     
-    n = n+1;
-    tau = tau0;
+    if abs(time - tInit - (n-1)*tau0) < 1e-6*tau0
+        tau = min(tau0, tMax - time);
+        t(n) = time;
+        S(:, n) = [s0; ph1.s; ph2.s; ph3.s];
+        n = n+1;
+    else
+        tau = tInit + (n-1)*tau0 - time;
+    end
 end
-s = [ ones(1, length(t))*s0; ph1.s; ph2.s; ph3.s];
+%s = [ ones(1, length(t))*s0; ph1.s; ph2.s; ph3.s];
 
 % Масшабирование к исходной размерности
 X = X*x0;
 T = T*t0;
 U = U*U0;
-s = s*x0;
+S = S*x0;
 t = t*t0;
 
 elapsedTime = toc;

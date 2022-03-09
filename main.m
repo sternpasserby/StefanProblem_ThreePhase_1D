@@ -31,7 +31,9 @@ ic.u1 = zeros(1, Np) + 273.15 + 0;
 ic.u2 = zeros(1, Np) + 273.15 - 2;
 ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, 'tau', 3600*24*30, 'tMax', 20*365.25*24*3600);
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, 'tau', 3600*24*30, ...
+                                              'tauSave', 3600*24*30, ...
+                                              'tMax', 20*365.25*24*3600);
 % plot(s', '.')
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 % subplot(5, 1, [2 5]);
