@@ -1,4 +1,4 @@
-function [S, t, U, X, T] = StefanProblemSolver(pc, bc, varargin)
+function [s, t, U, X, T] = StefanProblemSolver(pc, bc, varargin)
 %STEFANPROBLEMSOLVER Решатель трехфазной задачи Стефана
 %   На вход подаются 3 структуры, число узлов сетки для каждой фазы Np,
 %   размер временнОго шага tau и время моделирования tMax. Возвращает 3
@@ -49,11 +49,11 @@ addParameter(parserObj, 'minNewPhaseThickness', defaultMinNewPhaseThickness);
 lambda1 = pc.lambda1;
      c1 = pc.c1;
    rho1 = pc.rho1;
-  a1_sq = pc.a1_sq;
+%  a1_sq = pc.a1_sq;
 lambda2 = pc.lambda2;
      c2 = pc.c2;
    rho2 = pc.rho2;
-  a2_sq = pc.a2_sq;
+%  a2_sq = pc.a2_sq;
      Uf = pc.Uf;
      qf = pc.qf;
   alpha = bc.alpha;
@@ -85,7 +85,7 @@ g1 = @(t)(bc.g1(t*t0)/U0);
 u1 = ic.u1/U0;
 u2 = ic.u2/U0;
 u3 = ic.u3/U0;
-s = ic.s/x0;
+S = ic.s/x0;
 tInit = ic.tInit/t0;
 tau = tau/t0;
 tauSave = tauSave/t0;
@@ -96,7 +96,7 @@ minDs = minDs/x0;
 minNewPhaseThickness = minNewPhaseThickness/x0;
 s0 = ic.s(1)/x0;
 
-numOfTimeSteps = ceil(tMax/tau);
+% Интерполяция начального распределения температуры для каждой фазы
 ksiNew = getGrid(Np(1));
 if ~(ic.s(1)==ic.s(2))
     ksi = ( ic.x1 - ic.s(1) ) ./ ( ic.s(2) - ic.s(1) );
@@ -109,8 +109,8 @@ end
 ph1 = struct('ksi', ksiNew, ...
              'u', u1, ...
              'uPast', u1, ...
-             's', s(2), ...
-             'sPast', s(2), ...
+             's', S(2), ...
+             'sPast', S(2), ...
              'dsdt', 0, ...
              'exists', ~(ic.s(1)==ic.s(2)) );
 %ph1.s(1) = ic.s(2)/x0;
@@ -120,8 +120,8 @@ u2 = interp1(ksi, u2, ksiNew, 'linear', 'extrap')';
 ph2 = struct('ksi', ksiNew, ...
              'u', u2, ... %'u', csInterp(ksi, u2, ksiNew, [1 0; 1 0], Uf, Uf), ...
              'uPast', u2, ...
-             's', s(3), ...
-             'sPast', s(3), ...
+             's', S(3), ...
+             'sPast', S(3), ...
              'dsdt', 0, ...
              'exists', true );
 %ph2.s(1) = ic.s(3)/x0;
@@ -137,14 +137,17 @@ end
 ph3 = struct('ksi', ksiNew, ...
              'u', u3, ...
              'uPast', u3, ...
-             's', s(4), ...
-             'sPast', s(4), ...
+             's', S(4), ...
+             'sPast', S(4), ...
              'dsdt', 0, ...
              'exists', ~(ic.s(3)==ic.s(4)) );
 %ph3.s(1) = ic.s(4)/x0;
 
-t = zeros(1, numOfTimeSteps + 1);
-S = zeros(4, numOfTimeSteps + 1);
+numOfTimeSteps = ceil(tMax/tau);
+% t = zeros(1, numOfTimeSteps + 1);
+% s = zeros(4, numOfTimeSteps + 1);
+t = zeros(1, 10*numOfTimeSteps);
+s = zeros(4, 10*numOfTimeSteps);
 
 nRows = sum(NpSave);
 nCols = min(numOfTimeSteps, ceil(tMax/tauSave) ) + 1;
@@ -164,7 +167,7 @@ ksiSave1 = getGrid(NpSave(1));
 if ph1.exists
     %u1q = csInterp(ph1.ksi, ph1.u, ksiSave1, [alpha(1, :); 1 0], g0(tInit), Uf);
     u1q = interp1(ph1.ksi, ph1.u, ksiSave1, 'linear', 'extrap')';
-    x1q = s(1) + ksiSave1*( ph1.s(1) - s(1) );
+    x1q = S(1) + ksiSave1*( ph1.s(1) - S(1) );
 else
     x1q = ksiSave1.*NaN;
     u1q = ksiSave1'.*NaN;
@@ -184,7 +187,7 @@ else
 end
 U(:, 1) = [u1q; u2q; u3q];
 X(:, 1) = [x1q'; x2q'; x3q'];
-S(:, 1) = s';
+s(:, 1) = S';
 t(1) = tInit;
 
 saveTime = tauSave;
@@ -193,6 +196,9 @@ saveId = 2;
 time = tInit;
 tau0 = tau;     % Шаг по времени, заданный пользователем
 n = 2;
+numOfActualTimeSteps = 0;
+
+%tauAr = zeros(size(t));
 
 clear printProgressBar;
 tic;
@@ -260,7 +266,8 @@ while n <= numOfTimeSteps + 1
     end
     time = time + tau;
     
-    Uf_adj = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s - ph1.s )*x0)/U0;
+    % Температура фазового перехода с поправкой на давление толщи льда
+    Uf_adj = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s - ph1.s )*x0)/U0;     % adj - adjusted
     
     % Получение распределения тепла для первой фазы (если она есть)
     if ph1.exists
@@ -364,9 +371,24 @@ while n <= numOfTimeSteps + 1
 %     plot(x3*x0, ( ph3.u - 1 )*U0)
 %     hold off
     
+    if abs(time - tInit - (n-1)*tau0) < 1e-6*tau0
+        tau = min(tau0, tMax - time);
+        %t(n) = time;
+        %s(:, n) = [s0; ph1.s; ph2.s; ph3.s];
+        n = n+1;
+    else
+        tau = tInit + (n-1)*tau0 - time;
+    end
+    
+    numOfActualTimeSteps = numOfActualTimeSteps + 1;
+    t(numOfActualTimeSteps + 1) = time;
+    s(:, numOfActualTimeSteps + 1) = [s0; ph1.s; ph2.s; ph3.s];
+    tauAr(numOfActualTimeSteps) = tau;
+    
     % Запись результатов
     %t(n + 1) = time;
-    if (saveTime <= time)
+    %if (saveTime <= time)
+    if saveTime - time <= 1e-6*tauSave || n == numOfTimeSteps + 2
         %fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
         printProgressBar(saveTime, tMax);
         
@@ -399,23 +421,18 @@ while n <= numOfTimeSteps + 1
         saveTime = saveTime + tauSave;
         saveId = saveId + 1;
     end
-    
-    if abs(time - tInit - (n-1)*tau0) < 1e-6*tau0
-        tau = min(tau0, tMax - time);
-        t(n) = time;
-        S(:, n) = [s0; ph1.s; ph2.s; ph3.s];
-        n = n+1;
-    else
-        tau = tInit + (n-1)*tau0 - time;
-    end
 end
-%s = [ ones(1, length(t))*s0; ph1.s; ph2.s; ph3.s];
+id = find(t == 0);
+id(1) = [];
+t(id) = [];
+s(:, id) = [];
+%tauAr(id) = [];
 
 % Масшабирование к исходной размерности
 X = X*x0;
 T = T*t0;
 U = U*U0;
-S = S*x0;
+s = s*x0;
 t = t*t0;
 
 elapsedTime = toc;

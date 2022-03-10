@@ -13,32 +13,54 @@ bc.g0 = @(t)(0.05);
 bc.g1 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
 
 %%% Параметры численного решения
-Np = 1000;            % Число узлов сетки для каждой фазы
+Np = [100 1000 100];            % Число узлов сетки для каждой фазы
 tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*14;     % Шаг по времени, с
-tauSave = 3600*24*365.25/4;
+tau = 3600*24*30;     % Шаг по времени, с
+tauSave = tau*6;
 
 %%% Начальные условия
 % 1897000,-3000,820,0,3310,2490,52.621367149353,85.577331466675,1.6650680303574
-ic = struct;
-ic.s0 = 820;
-ic.s1 = 3310 - 2490;
-ic.s2 = 3310;
-ic.s3 = 3310;
-%ic.accumRate = 85.577331466675;
-bc.g0 = @(t)(52.621367149353/1000);
-ic.u1 = zeros(1, Np) + 273.15 + 0;
-ic.u2 = zeros(1, Np) + 273.15 - 2;
-ic.u3 = zeros(1, Np) + 273.15 + 1;
+% ic = struct;
+% ic.s0 = 820;
+% ic.s1 = 3310 - 2490;
+% ic.s2 = 3310;
+% ic.s3 = 3310;
+% %ic.accumRate = 85.577331466675;
+% bc.g0 = @(t)(52.621367149353/1000);
+% ic.u1 = zeros(1, Np) + 273.15 + 0;
+% ic.u2 = zeros(1, Np) + 273.15 - 2;
+% ic.u3 = zeros(1, Np) + 273.15 + 1;
 
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, 'tau', 3600*24*30, ...
-                                              'tauSave', 3600*24*30, ...
-                                              'tMax', 20*365.25*24*3600);
-% plot(s', '.')
+WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
+% z = linspace(0, 4000, 10000); 
+% plot(z, WaisDivide(z))
+% Uf_adj = @(z)( - 7.43*1e-8*pc.rho2*9.81*z);
+% hold on
+% plot(z, Uf_adj(z));
+% hold off
+
+s = [820; 3310 - 2490; 3310; 3310];
+x2 = linspace(s(2), s(3), Np(2));
+%u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
+u2 = -2*ones(size(x2)) + 273.15;
+ic = struct('s', s, ...
+            'dsdt', zeros(4, 1), ...
+            'x1', linspace(s(1), s(2), Np(1)), ...
+            'u1', 273.15 + zeros(Np(1), 1), ...
+            'x2', x2, ...
+            'u2', u2, ...
+            'x3', linspace(s(3), s(4), Np(3)), ...
+            'u3', 273.15 + ones(Np(3), 1), ...
+            'tInit', 0);
+
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
+                                              'tauSave', tauSave, ...
+                                              'tMax', tMax, ...
+                                              'NpSave', [100 1000 100]);
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
-% subplot(5, 1, [2 5]);
+% %subplot(5, 1, [2 5]);
 % contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-% axis([-inf inf ic.s0 ic.s3])
+% axis([-inf inf s(1, 1) max(s(4, :))])
 % hold on
 % plot(t/3600/24, s, '-w', 'LineWidth', 2)
 % hold off
@@ -49,36 +71,36 @@ ic.u3 = zeros(1, Np) + 273.15 + 1;
 % hcb = colorbar;
 % hcb.Title.String = "T, C";
 
-% Проверка закона сохранения массы
+%Проверка закона сохранения массы
 figure
-% m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
-% subplot(3, 1, 1)
-% plot(t/3600/24, m, 'LineWidth', 2)
-% xlabel("t, days")
-% ylabel("m, kg")
-% title("m(t)")
-% set(gca, 'FontSize', 20)
-subplot(2, 1, 1)
+m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
+subplot(3, 1, 1)
+plot(t/3600/24, m, 'LineWidth', 2)
+xlabel("t, days")
+ylabel("m, kg")
+title("m(t)")
+set(gca, 'FontSize', 20)
+subplot(3, 1, 2)
 plot(t/3600/24, s, 'LineWidth', 2)
 xlabel("t, days")
 ylabel("X, meters")
 axis([-inf inf min(s(4, :)) max(s(4, :))])
 title("Координата поверхности ледника")
-set(gca, 'FontSize', 20)
-subplot(2, 1, 2)
+%set(gca, 'FontSize', 20)
+subplot(3, 1, 3)
 plot(t/3600/24, s, 'LineWidth', 2)
 xlabel("t, days")
 ylabel("X, meters")
 axis([-inf inf min(s(2, :)) max(s(2, :))])
 title("Координата нижней кромки ледника")
-set(gca, 'FontSize', 20)
+%set(gca, 'FontSize', 20)
 
 % figure
 % hold on
-% tId = [1 400 800];
+% tId = [1 100 523];
 % legendArray = cell(1, length(tId));
 % for i = 1:length(tId)
-%     plot(X(101:200, tId(i)), U(101:200, tId(i)) - 273.15, 'LineWidth', 2);
+%     plot(X(101:100+10000, tId(i)), U(101:100+10000, tId(i)) - 273.15, 'LineWidth', 2);
 %     legendArray(i) = {sprintf("t = %8.2f years", T(1, tId(i))/3600/24/365.25)};
 % end
 % hold off
@@ -86,7 +108,7 @@ set(gca, 'FontSize', 20)
 % xlabel("X, m");
 % ylabel("T, C")
 % legend(legendArray, 'location', 'best')
-% axis([-inf inf -3 inf])
+% axis([-inf inf -inf inf])
 % set(gca, 'FontSize', 24)
 
 % h = figure;
