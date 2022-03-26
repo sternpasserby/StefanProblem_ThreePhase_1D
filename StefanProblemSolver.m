@@ -21,7 +21,7 @@ defaultTau = 3600*24*14;
 defaultTMax = 20*365.25*24*3600; 
 defaultChLength = defaultIc.s(3) - defaultIc.s(2);
 defaultChTemperature = pc.Uf;
-defaultGridType = 'NonUniform';
+defaultGridType = 'Uniform';
 defaultNpSave = [100 200 100];
 defaultTauSave = defaultTau;
 defaultDs = 0.01;
@@ -95,6 +95,16 @@ alpha(:, 2) = bc.alpha(:, 2)/x0;
 minDs = minDs/x0;
 minNewPhaseThickness = minNewPhaseThickness/x0;
 s0 = ic.s(1)/x0;
+
+% Настройка function handle на функцию, которая генерирует заданную сетку
+switch gridType
+    case 'Uniform'
+        getGrid = @reconstructGrid_uniform;
+    case 'SplineBased'
+        getGrid = @reconstructGrid_spline;
+    otherwise
+        error("Unknown grid type %s", gridType);
+end
 
 % Интерполяция начального распределения температуры для каждой фазы
 ksiNew = getGrid(Np(1));
@@ -439,11 +449,11 @@ elapsedTime = toc;
 fprintf("Elapsed time for Stefan Problem Solver: %4.2f sec.\n", elapsedTime);
 end
 
-% function xNew = getGrid(Np)
-%     xNew = linspace(0, 1, Np);
-% end
+function xNew = reconstructGrid_uniform(Np)
+    xNew = linspace(0, 1, Np);
+end
 
-function xNew = getGrid(Np)
+function xNew = reconstructGrid_spline(Np)
     X = [0 1/4 3/4 1];
     H = 0.1;
     ppF = struct();
