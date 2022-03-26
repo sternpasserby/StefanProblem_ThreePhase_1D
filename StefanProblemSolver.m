@@ -212,8 +212,8 @@ numOfActualTimeSteps = 0;
 
 clear printProgressBar;
 tic;
-%while time <= tMax
-while n <= numOfTimeSteps + 1
+while time <= tMax
+%while n <= numOfTimeSteps + 1
     ph1.uPast = ph1.u;
     ph2.uPast = ph2.u;
     ph3.uPast = ph3.u;
@@ -381,14 +381,14 @@ while n <= numOfTimeSteps + 1
 %     plot(x3*x0, ( ph3.u - 1 )*U0)
 %     hold off
     
-    if abs(time - tInit - (n-1)*tau0) < 1e-6*tau0
-        tau = min(tau0, tMax - time);
-        %t(n) = time;
-        %s(:, n) = [s0; ph1.s; ph2.s; ph3.s];
-        n = n+1;
-    else
-        tau = tInit + (n-1)*tau0 - time;
-    end
+%     if abs(time - tInit - (n-1)*tau0) < 1e-6*tau0
+%         tau = min(tau0, tMax - time);
+%         %t(n) = time;
+%         %s(:, n) = [s0; ph1.s; ph2.s; ph3.s];
+%         n = n+1;
+%     else
+%         tau = tInit + (n-1)*tau0 - time;
+%     end
     
     numOfActualTimeSteps = numOfActualTimeSteps + 1;
     t(numOfActualTimeSteps + 1) = time;
@@ -431,6 +431,9 @@ while n <= numOfTimeSteps + 1
         saveTime = saveTime + tauSave;
         saveId = saveId + 1;
     end
+    
+    tau = tau0;
+    n = n+1;
 end
 id = find(t == 0);
 id(1) = [];
