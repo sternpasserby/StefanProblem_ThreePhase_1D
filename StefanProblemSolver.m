@@ -102,6 +102,8 @@ switch gridType
         getGrid = @reconstructGrid_uniform;
     case 'SplineBased'
         getGrid = @reconstructGrid_spline;
+    case 'SigmoidBased'
+        getGrid = @(x)( reconstructGrid_sigmoid(x, 0.01*1e-3/(ic.s(3)-ic.s(2)) ) );
     otherwise
         error("Unknown grid type %s", gridType);
 end
@@ -252,7 +254,7 @@ while time <= tMax
     
     %fprintf("%10.4e %10.4e %10.4e %10.4e\n", tau, ph1.dsdt, ph2.dsdt, ph3.dsdt);
     
-    if (abs( tau*ph2.dsdt ) > minDs && ph2.exists) || ...
+    if (abs( tau*ph2.dsdt ) > minDs && ph3.exists) || ...
             (abs( tau*ph3.dsdt ) > minDs && ph1.exists)
         tau = tau/2;
         continue;
@@ -486,6 +488,15 @@ function xNew = reconstructGrid_spline(Np)
     if ~all(xNew >= 0 & xNew <= 1)
         error("Some of xNew elements lie outside of [0, 1] domain!");
     end
+end
+
+function xNew = reconstructGrid_sigmoid(Np, dx1)
+    x1 = -10;
+    alpha = -1/x1*log( 1/dx1 - 1 );
+    x = linspace(x1, -x1, Np-2);
+    xNew = [0 1 ./ (1 + exp(-alpha*x)) 1];
+    xNew(2) = (xNew(3)-xNew(1))/2;
+    xNew(Np-1) = xNew(Np-2) + (xNew(Np)-xNew(Np-2))/2;
 end
 
 function yNew = csInterp(x, y, xq, alpha, g0, g1)

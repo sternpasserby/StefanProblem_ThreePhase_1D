@@ -9,14 +9,15 @@ pc = getPhysicalConstants("RealLife");
 % alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
 bc = struct;                  % bc - boundary conditions
 bc.alpha = [0 -pc.lambda1; 1 0];
-bc.g0 = @(t)(0.05);
-bc.g1 = @(t)(- 4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
+bc.g0 = @(t)(52.6214/1000);
+%bc.g1 = @(t)(-4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
+bc.g1 = @(t)( -47.8797 + 0.082/(10*365.25*24*3600)*t + 14.5503*sin(2*pi*t/31556952) + 273.15);
 
 %%% Параметры численного решения
-Np = [100 1000 100];            % Число узлов сетки для каждой фазы
-tMax = 20*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*30;     % Шаг по времени, с
-tauSave = tau*6;
+Np = [500 5000 500];            % Число узлов сетки для каждой фазы
+tMax = 1000*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tau = 3600*24*365.25/3;     % Шаг по времени, с
+tauSave = 3600*24*365.25*10;
 
 %%% Начальные условия
 % 1897000,-3000,820,0,3310,2490,52.621367149353,85.577331466675,1.6650680303574
@@ -42,7 +43,8 @@ WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^
 s = [820; 3310 - 2490; 3310; 3310];
 x2 = linspace(s(2), s(3), Np(2));
 %u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
-u2 = -2*ones(size(x2)) + 273.15;
+%u2 = -2*ones(size(x2)) + 273.15;
+u2 = linspace(-2 + 273.15, bc.g1(0), Np(2));
 ic = struct('s', s, ...
             'dsdt', zeros(4, 1), ...
             'x1', linspace(s(1), s(2), Np(1)), ...
@@ -56,8 +58,16 @@ ic = struct('s', s, ...
 [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
                                               'tauSave', tauSave, ...
                                               'tMax', tMax, ...
-                                              'gridType', 'SplineBased', ...
+                                              'Np', Np,...
+                                              'gridType', 'SigmoidBased', ...
                                               'NpSave', [100 1000 100]);
+plot(t, s(2, 1:end))
+ 
+figure
+plot(X(:, 1), U(:, 1))
+hold on
+plot(X(:, end-1), U(:, end-1))
+hold off
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 % %subplot(5, 1, [2 5]);
 % contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
@@ -73,27 +83,27 @@ ic = struct('s', s, ...
 % hcb.Title.String = "T, C";
 
 %Проверка закона сохранения массы
-figure
-m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
-subplot(3, 1, 1)
-plot(t/3600/24, m, 'LineWidth', 2)
-xlabel("t, days")
-ylabel("m, kg")
-title("m(t)")
-set(gca, 'FontSize', 20)
-subplot(3, 1, 2)
-plot(t/3600/24, s, 'LineWidth', 2)
-xlabel("t, days")
-ylabel("X, meters")
-axis([-inf inf min(s(4, :)) max(s(4, :))])
-title("Координата поверхности ледника")
-%set(gca, 'FontSize', 20)
-subplot(3, 1, 3)
-plot(t/3600/24, s, 'LineWidth', 2)
-xlabel("t, days")
-ylabel("X, meters")
-axis([-inf inf min(s(2, :)) max(s(2, :))])
-title("Координата нижней кромки ледника")
+% figure
+% m = (s(2, :) - s(1, :))*pc.rho1 + (s(3, :) - s(2, :))*pc.rho2 + (s(4, :) - s(3, :))*pc.rho1;
+% subplot(3, 1, 1)
+% plot(t/3600/24, m, 'LineWidth', 2)
+% xlabel("t, days")
+% ylabel("m, kg")
+% title("m(t)")
+% set(gca, 'FontSize', 20)
+% subplot(3, 1, 2)
+% plot(t/3600/24, s, 'LineWidth', 2)
+% xlabel("t, days")
+% ylabel("X, meters")
+% axis([-inf inf min(s(4, :)) max(s(4, :))])
+% title("Координата поверхности ледника")
+% %set(gca, 'FontSize', 20)
+% subplot(3, 1, 3)
+% plot(t/3600/24, s, 'LineWidth', 2)
+% xlabel("t, days")
+% ylabel("X, meters")
+% axis([-inf inf min(s(2, :)) max(s(2, :))])
+% title("Координата нижней кромки ледника")
 %set(gca, 'FontSize', 20)
 
 % figure
