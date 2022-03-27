@@ -44,7 +44,8 @@ s = [820; 3310 - 2490; 3310; 3310];
 x2 = linspace(s(2), s(3), Np(2));
 %u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
 %u2 = -2*ones(size(x2)) + 273.15;
-u2 = linspace(-2 + 273.15, bc.g1(0), Np(2));
+Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ))
+u2 = linspace(Uf_adj, bc.g1(0), Np(2));
 ic = struct('s', s, ...
             'dsdt', zeros(4, 1), ...
             'x1', linspace(s(1), s(2), Np(1)), ...
