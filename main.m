@@ -62,13 +62,13 @@ ic = struct('s', s, ...
                                               'Np', Np,...
                                               'gridType', 'SigmoidBased', ...
                                               'NpSave', [100 1000 100]);
-plot(t, s(2, 1:end))
+plot(t, s)
  
-figure
-plot(X(:, 1), U(:, 1))
-hold on
-plot(X(:, end-1), U(:, end-1))
-hold off
+% figure
+% plot(X(:, 1), U(:, 1))
+% hold on
+% plot(X(:, end-1), U(:, end-1))
+% hold off
 % figure%('DefaultAxesFontSize',15)%, 'windowState', 'maximized')
 % %subplot(5, 1, [2 5]);
 % contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
