@@ -16,7 +16,7 @@ defaultIc = struct('s', [-130; -129; 1100; 1100], ...
                    'x3', ones(defaultNp(3), 1)*1100, ...
                    'u3', 273.15 + ones(defaultNp(3), 1), ...
                    'tInit', 0);
-defaultAccumRate = 85.5;
+defaultAccumRate = 0;
 defaultTau = 3600*24*14;
 defaultTMax = 20*365.25*24*3600; 
 defaultChLength = defaultIc.s(3) - defaultIc.s(2);
@@ -221,8 +221,7 @@ numOfActualTimeSteps = 0;
 
 %tauAr = zeros(size(t));
 
-clear printProgressBar;
-tic;
+pb = ConsoleProgressBar();
 while time <= tMax
 %while n <= numOfTimeSteps + 1
     ph1.uPast = ph1.u;
@@ -411,7 +410,7 @@ while time <= tMax
     %if (saveTime <= time)
     if saveTime - time <= 1e-6*tauSave || n == numOfTimeSteps + 2
         %fprintf("Progress: %4.2f%%\n", saveTime/tMax*100);
-        printProgressBar(saveTime, tMax);
+        pb.setProgress(saveTime, tMax);
         
         %ksiSave1 = getGrid(NpSave(1));
         if ph1.exists
@@ -458,9 +457,6 @@ T = T*t0;
 U = U*U0;
 s = s*x0;
 t = t*t0;
-
-elapsedTime = toc;
-fprintf("Elapsed time for Stefan Problem Solver: %4.2f sec.\n", elapsedTime);
 end
 
 function xNew = reconstructGrid_uniform(Np)
@@ -527,42 +523,4 @@ function yNew = csInterp(x, y, xq, alpha, g0, g1)
     pp = csape(x, [C0; y; C1]', conds);
     yNew = ppval(pp, xq)';
 end
-
-function printProgressBar(n, N)
-%PRINTPROGRESSBAR Summary of this function goes here
-%   Detailed explanation goes here
-
-persistent barLength;
-persistent leftSymbol;
-persistent rightSymbol;
-persistent completedSymbol;
-persistent todoSymbol;
-persistent reverseStr;
-
-fraction = n/N;
-isInit = (isempty(reverseStr) && fraction <= 1);
-if isInit
-          barLength = 25;
-         leftSymbol = '[';
-        rightSymbol = ']';
-    completedSymbol = '=';
-         todoSymbol = ' ';
-         reverseStr = '';
-end
-
-numOfSegments = floor(fraction*barLength);
-completedStr = repmat(completedSymbol, 1, numOfSegments);
-todoStr = repmat(todoSymbol, 1, barLength - numOfSegments);
-%msg = sprintf([leftSymbol completedStr todoStr  rightSymbol ' %5.2f%% (%d / %d)'], fraction*100, n, N);
-msg = sprintf(...
-    [leftSymbol ... 
-    completedStr ... 
-    todoStr ... 
-    rightSymbol, ...
-    ' %5.2f%%'], fraction*100);
-    %' %5.2f%% (%d/%d)'], fraction*100, n, N);
-disp([reverseStr msg]);
-reverseStr = repmat(sprintf('\b'), 1, length(msg)+1);
-end
-
 
