@@ -3,45 +3,6 @@ clear; close all;
 %%% Физические константы
 pc = getPhysicalConstants("RealLife");
 
-%%% Смешанные краевые условия
-% Формат краевых условий:
-% alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
-% alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
-bc = struct;                  % bc - boundary conditions
-bc.alpha = [0 -pc.lambda1; 1 0];
-bc.g0 = @(t)(52.6214/1000);
-bc.g1 = @(t)(-4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
-
-%%% Параметры численного решения
-Np = [500 5000 500];            % Число узлов сетки для каждой фазы
-tMax = 4*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*365.25/12;        % Шаг по времени, с
-tauSave = 3600*24*365.25;
-
-%%% Начальные условия
-s = [0; 7; 79; 80];
-x2 = linspace(s(2), s(3), Np(2));
-u2 = -1*ones(1, length(x2)) + 273.15;
-accumRate = 0;
-ic = struct('s', s, ...
-            'dsdt', zeros(4, 1), ...
-            'x1', linspace(s(1), s(2), Np(1)), ...
-            'u1', 273.15 + zeros(Np(1), 1), ...
-            'x2', x2, ...
-            'u2', u2, ...
-            'x3', linspace(s(3), s(4), Np(3)), ...
-            'u3', 273.15 + 0*ones(Np(3), 1), ...
-            'tInit', 0);
-
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
-                                              'tauSave', tauSave, ...
-                                              'tMax', tMax, ...
-                                              'Np', Np,...
-                                              'gridType', 'SigmoidBased', ...
-                                              'NpSave', [100 1000 100], ...
-                                              'accumRate', accumRate);
-                                          
-% %%% МОДЕЛИРОВАНИЕ ДЛЯ ТОЧКИ №64129 ИЗ РАЗРЕЖЕННОГО ГРИДА НАЧАЛЬНЫХ ДАННЫХ
 % %%% Смешанные краевые условия
 % % Формат краевых условий:
 % % alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
@@ -49,23 +10,19 @@ ic = struct('s', s, ...
 % bc = struct;                  % bc - boundary conditions
 % bc.alpha = [0 -pc.lambda1; 1 0];
 % bc.g0 = @(t)(52.6214/1000);
-% bc.g1 = @(t)( -47.8797 + 0.082/(10*365.25*24*3600)*t + 14.5503*sin(2*pi*t/31556952) + 273.15);
+% bc.g1 = @(t)(-4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание, здесь сдвиг по фазе на pi/2
 % 
 % %%% Параметры численного решения
 % Np = [500 5000 500];            % Число узлов сетки для каждой фазы
-% tMax = 100*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-% tau = 3600*24*365.25/12;        % Шаг по времени, с
-% tauSave = 3600*24*365.25;
+% tMax = 4*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+% tau = 3600*24*365.25/365.25;        % Шаг по времени, с
+% tauSave = 3600*24*365.25/24;
 % 
 % %%% Начальные условия
-% s = [820; 3310 - 2490; 3310; 3310];
+% s = [0; 7; 79; 80];
 % x2 = linspace(s(2), s(3), Np(2));
-% %WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
-% %u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
-% Uf_adj = (273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) ));
-% u2 = linspace(Uf_adj, 273.15, Np(2));
-% %u2 = -2*ones(size(x2)) + 273.15;
-% accumRate = 85.577331466675000;
+% u2 = -1*ones(1, length(x2)) + 273.15;
+% accumRate = 0;
 % ic = struct('s', s, ...
 %             'dsdt', zeros(4, 1), ...
 %             'x1', linspace(s(1), s(2), Np(1)), ...
@@ -75,37 +32,81 @@ ic = struct('s', s, ...
 %             'x3', linspace(s(3), s(4), Np(3)), ...
 %             'u3', 273.15 + 0*ones(Np(3), 1), ...
 %             'tInit', 0);
-%         
+% 
 % [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
 %                                               'tauSave', tauSave, ...
 %                                               'tMax', tMax, ...
 %                                               'Np', Np,...
 %                                               'gridType', 'SigmoidBased', ...
-%                                               'NpSave', [100 1000 100], ...
+%                                               'NpSave', [Np], ...
 %                                               'accumRate', accumRate);
+                                          
+%%% МОДЕЛИРОВАНИЕ ДЛЯ ТОЧКИ №64129 ИЗ РАЗРЕЖЕННОГО ГРИДА НАЧАЛЬНЫХ ДАННЫХ
+%%% Смешанные краевые условия
+% Формат краевых условий:
+% alpha00*u1(0, t) + alpha01*du1/dx(0, t) = g0(t) - для левого конца
+% alpha10*u2(L, t) + alpha11*du2/dx(L, t) = g1(t) - для правого конца
+bc = struct;                  % bc - boundary conditions
+bc.alpha = [0 -pc.lambda1; 1 0];
+bc.g0 = @(t)(52.6214/1000);
+bc.g1 = @(t)( -47.8797 + 0.082/(10*365.25*24*3600)*t + 14.5503*sin(2*pi*t/31556952) + 273.15);
 
+%%% Параметры численного решения
+Np = [500 5000 500];            % Число узлов сетки для каждой фазы
+tMax = 1000*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tau = 3600*24*365.25/12;        % Шаг по времени, с
+tauSave = 3600*24*365.25*100;
+
+%%% Начальные условия
+s = [820; 3310 - 2490; 3310; 3310];
+x2 = linspace(s(2), s(3), Np(2));
+%WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
+%u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
+u2 = -2*ones(size(x2)) + 273.15;
+accumRate = 85.577331466675000;
+ic = struct('s', s, ...
+            'dsdt', zeros(4, 1), ...
+            'x1', linspace(s(1), s(2), Np(1)), ...
+            'u1', 273.15 + zeros(Np(1), 1), ...
+            'x2', x2, ...
+            'u2', u2, ...
+            'x3', linspace(s(3), s(4), Np(3)), ...
+            'u3', 273.15 + 0*ones(Np(3), 1), ...
+            'tInit', 0);
+elTimes = zeros(30, 1);
+for i = 1:length(elTimes)
+tic
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
+                                              'tauSave', tauSave, ...
+                                              'tMax', tMax, ...
+                                              'Np', Np,...
+                                              'gridType', 'SigmoidBased', ...
+                                              'NpSave', [100 1000 100], ...
+                                              'accumRate', accumRate);
+elTimes(i) = toc;
+end
 %[t, s] = reduceNumOfPointsInS(t, s, 0.1);
  
-figure
-plot(X(:, 1), U(:, 1) - 273.15)
-hold on; plot(X(:, end-1), U(:, end-1) - 273.15); hold off
-xlabel("X, meters");
-ylabel("T, C");
-lg = legend("u2 init", "u2 end"); lg.Location = 'best';
-
-figure
-%subplot(5, 1, [2 5]);
-contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-axis([-inf inf s(1, 1) max(s(4, :))])
-hold on
-plot(t/3600/24, s, '-w', 'LineWidth', 2)
-hold off
-xlabel("t, days")
-ylabel("X, meters")
-colormap(jet); 
-caxis([-12 3])
-hcb = colorbar;
-hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
+% figure
+% plot(X(:, 1), U(:, 1) - 273.15)
+% hold on; plot(X(:, end-1), U(:, end-1) - 273.15); hold off
+% xlabel("X, meters");
+% ylabel("T, C");
+% lg = legend("u2 init", "u2 end"); lg.Location = 'best';
+% 
+% figure
+% %subplot(5, 1, [2 5]);
+% contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
+% axis([-inf inf s(1, 1) max(s(4, :))])
+% hold on
+% plot(t/3600/24, s, '-w', 'LineWidth', 2)
+% hold off
+% xlabel("t, days")
+% ylabel("X, meters")
+% colormap(jet); 
+% caxis([-12 3])
+% hcb = colorbar;
+% hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
 
 m = (s(2, :) - s(1, :))*pc.rho1 + ...
     (s(3, :) - s(2, :))*pc.rho2 + ...
