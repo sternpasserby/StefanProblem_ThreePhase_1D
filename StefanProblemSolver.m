@@ -350,24 +350,28 @@ while time <= tMax
     
     % Зарождение нижней фазы
     if ph2.u(1) > Uf_adj && ph2.u(2) > Uf_adj && ~ph1.exists
+        x2 = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
+        Uf_adj_ar = (273.15 - 7.43*1e-8*rho2*9.81*( ph2.s - x2)*x0)'/U0;
+        
         % Поиск номера последнего узла, который должен быть водой
         id = 1;
         for i = 1:Np(2)
-            if ph2.u(i) < Uf_adj
+            if ph2.u(i) < Uf_adj_ar(i)
                 id = i - 1;
                 break;
             end
         end
         
         % Вычисление толщины новой фазы
-        x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
-        dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj)*U0);
+        %x = ph1.s + ph2.ksi.*(ph2.s - ph1.s);
+        %dl = c2*rho2/qf/rho1*trapz(x(1:id), abs(ph2.u(1:id) - Uf_adj_ar(1:id))*U0);
+        dl = c2*rho2/qf/rho1*trapz(x2(1:id), abs(ph2.u(1:id) - Uf_adj_ar(1:id))*U0);
         
         if dl >= minNewPhaseThickness
             ph1.s = s0 + dl;
             ph1.u = ones(Np(1), 1)*Uf_adj;
             ph2.u(1:id) = Uf_adj;
-            ph2.u = interp1(x, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
+            ph2.u = interp1(x2, ph2.u, ph1.s + ph2.ksi.*(ph2.s - ph1.s), 'linear', 'extrap')';
             ph1.exists = true;
         end
     end

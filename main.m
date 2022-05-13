@@ -53,16 +53,18 @@ bc.g1 = @(t)( -47.8797 + 0.082/(10*365.25*24*3600)*t + 14.5503*sin(2*pi*t/315569
 
 %%% Параметры численного решения
 Np = [500 5000 500];            % Число узлов сетки для каждой фазы
-tMax = 1000*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tMax = 100*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24*365.25/12;        % Шаг по времени, с
 tauSave = 3600*24*365.25*100;
 
 %%% Начальные условия
 s = [820; 3310 - 2490; 3310; 3310];
 x2 = linspace(s(2), s(3), Np(2));
-%WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
-%u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
-u2 = -2*ones(size(x2)) + 273.15;
+% WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
+% u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
+% u2 = -2*ones(size(x2)) + 273.15;
+Uf_adj = 273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) );
+u2 = linspace(Uf_adj, pc.Uf, Np(2));  
 accumRate = 85.577331466675000;
 ic = struct('s', s, ...
             'dsdt', zeros(4, 1), ...
@@ -73,18 +75,13 @@ ic = struct('s', s, ...
             'x3', linspace(s(3), s(4), Np(3)), ...
             'u3', 273.15 + 0*ones(Np(3), 1), ...
             'tInit', 0);
-elTimes = zeros(30, 1);
-for i = 1:length(elTimes)
-tic
-[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
+elTimes = zeros(30, 1);[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
                                               'tauSave', tauSave, ...
                                               'tMax', tMax, ...
                                               'Np', Np,...
                                               'gridType', 'SigmoidBased', ...
                                               'NpSave', [100 1000 100], ...
                                               'accumRate', accumRate);
-elTimes(i) = toc;
-end
 %[t, s] = reduceNumOfPointsInS(t, s, 0.1);
  
 % figure
@@ -107,6 +104,8 @@ end
 % caxis([-12 3])
 % hcb = colorbar;
 % hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
+
+plot(t, s(1:2, :))
 
 m = (s(2, :) - s(1, :))*pc.rho1 + ...
     (s(3, :) - s(2, :))*pc.rho2 + ...
