@@ -24,6 +24,7 @@ defaultChTemperature = pc.Uf;
 defaultGridType = 'Uniform';
 defaultNpSave = [100 200 100];
 defaultTauSave = defaultTau;
+defaultNpBoundsSave = inf;
 defaultDs = 0.01;
 defaultMinNewPhaseThickness = 1*1e-3;
 
@@ -42,6 +43,7 @@ addParameter(parserObj, 'chTemperature', defaultChTemperature);
 addParameter(parserObj, 'gridType', defaultGridType);
 addParameter(parserObj, 'NpSave', defaultNpSave);
 addParameter(parserObj, 'tauSave', defaultTauSave);
+addParameter(parserObj, 'NpBoundsSave', defaultNpBoundsSave);
 addParameter(parserObj, 'minDs', defaultDs);
 addParameter(parserObj, 'minNewPhaseThickness', defaultMinNewPhaseThickness);
 
@@ -71,6 +73,7 @@ parse(parserObj, pc, bc, varargin{:});
             gridType = parserObj.Results.gridType;
               NpSave = parserObj.Results.NpSave;
              tauSave = parserObj.Results.tauSave;
+        NpBoundsSave = parserObj.Results.NpBoundsSave;
                minDs = parserObj.Results.minDs;
 minNewPhaseThickness = parserObj.Results.minNewPhaseThickness;
          
@@ -165,7 +168,7 @@ nRows = sum(NpSave);
 nCols = min(numOfTimeSteps, ceil(tMax/tauSave) ) + 1;
 X = zeros(nRows, nCols);
 U = zeros(nRows, nCols);
-T = zeros(nRows, nCols);
+T = zeros(1, nCols);
 
 % A1 = sparse(Np(1));
 % A2 = sparse(Np(2));
@@ -440,7 +443,7 @@ while time <= tMax
         end
         U(:, saveId) = [u1q; u2q; u3q];
         X(:, saveId) = [x1q'; x2q'; x3q'];
-        T(:, saveId) = ones(nRows, 1)*time;
+        T(saveId) = time;
         
         saveTime = saveTime + tauSave;
         saveId = saveId + 1;
@@ -455,12 +458,44 @@ t(id) = [];
 s(:, id) = [];
 %tauAr(id) = [];
 
+% Прореживание выходных данных для координат границ
+if ~isinf(NpBoundsSave)
+    [t, s] = reduceNumOfPointsInS(t, s, NpBoundsSave);
+end
+
 % Масшабирование к исходной размерности
 X = X*x0;
 T = T*t0;
 U = U*U0;
 s = s*x0;
 t = t*t0;
+end
+
+function [tNew, sNew] = reduceNumOfPointsInS(t, s, newN)
+    N = length(t);
+    nPointsPerEvent_halved = 3; % Сколько точек выделить слева и справа на 
+                                %   событие зарождения или исчезновения фазы
+
+    % Поиск индексов, где происходит создание или вырождение фазы
+    ds1 = s(2, :) - s(1, :);
+    ds3 = s(4, :) - s(3, :);
+    idPhase = zeros(1, N);
+    k = 1;
+    for i = 2:N
+        if ( abs(ds1(i-1)) < 1e-6 && abs(ds1(i)) > 0 ) || ...
+                ( abs(ds1(i-1)) > 0 && abs(ds1(i)) < 1e-6 ) || ...
+                ( abs(ds3(i-1)) < 1e-6 && abs(ds3(i)) > 0 ) || ...
+                ( abs(ds3(i-1)) > 0  && abs(ds3(i)) < 1e-6 )
+            idI = max(i-nPointsPerEvent_halved, 1):min(i+nPointsPerEvent_halved, N);
+            idPhase( k:k+length(idI)-1 ) = idI;
+            k = k + length(idI);
+        end
+    end
+    idPhase(k:end) = [];
+    
+    id = unique([ 1, idPhase, 1:ceil(N/newN):N, N ]);
+    tNew = t(id);
+    sNew = s(:, id);
 end
 
 function xNew = reconstructGrid_uniform(Np)
@@ -527,4 +562,6 @@ function yNew = csInterp(x, y, xq, alpha, g0, g1)
     pp = csape(x, [C0; y; C1]', conds);
     yNew = ppval(pp, xq)';
 end
+
+
 

@@ -55,16 +55,16 @@ bc.g1 = @(t)( -47.8797 + 0.082/(10*365.25*24*3600)*t + 14.5503*sin(2*pi*t/315569
 Np = [500 5000 500];            % Число узлов сетки для каждой фазы
 tMax = 100*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24*365.25/12;        % Шаг по времени, с
-tauSave = 3600*24*365.25*100;
+tauSave = 3600*24*365.25*1;
 
 %%% Начальные условия
 s = [820; 3310 - 2490; 3310; 3310];
 x2 = linspace(s(2), s(3), Np(2));
 % WaisDivide = @(z)( -31.799 + 8.8595*1e-3*z - 9.4649*1e-6*z.^2 + 2.657*1e-9 * z.^3 );
 % u2 = flip( WaisDivide( ( x2-x2(1) )/( x2(end)-x2(1) )*3512 ) ) + 273.15;
-% u2 = -2*ones(size(x2)) + 273.15;
-Uf_adj = 273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) );
-u2 = linspace(Uf_adj, pc.Uf, Np(2));  
+u2 = -2*ones(size(x2)) + pc.Uf;
+% Uf_adj = 273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) );
+% u2 = linspace(Uf_adj, pc.Uf, Np(2));  
 accumRate = 85.577331466675000;
 ic = struct('s', s, ...
             'dsdt', zeros(4, 1), ...
@@ -75,14 +75,14 @@ ic = struct('s', s, ...
             'x3', linspace(s(3), s(4), Np(3)), ...
             'u3', 273.15 + 0*ones(Np(3), 1), ...
             'tInit', 0);
-elTimes = zeros(30, 1);[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
-                                              'tauSave', tauSave, ...
-                                              'tMax', tMax, ...
-                                              'Np', Np,...
-                                              'gridType', 'SigmoidBased', ...
-                                              'NpSave', [100 1000 100], ...
-                                              'accumRate', accumRate);
-%[t, s] = reduceNumOfPointsInS(t, s, 0.1);
+[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
+                                                  'tauSave', tauSave, ...
+                                                'tMax', tMax, ...
+                                                'Np', Np,...
+                                                'gridType', 'SigmoidBased', ...
+                                                'NpSave', [100 1000 100], ...
+                                                'accumRate', accumRate, ...
+                                                'NpBoundsSave', 100);
  
 % figure
 % plot(X(:, 1), U(:, 1) - 273.15)
@@ -93,19 +93,22 @@ elTimes = zeros(30, 1);[s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', 
 % 
 % figure
 % %subplot(5, 1, [2 5]);
-% contourf(T(:, 1:end)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-% axis([-inf inf s(1, 1) max(s(4, :))])
-% hold on
-% plot(t/3600/24, s, '-w', 'LineWidth', 2)
-% hold off
-% xlabel("t, days")
-% ylabel("X, meters")
-% colormap(jet); 
-% caxis([-12 3])
-% hcb = colorbar;
-% hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
+contourf(repmat(T, length(X(:, 1)), 1)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
+axis([-inf inf s(1, 1) max(s(4, :))])
+hold on
+plot(t/3600/24, s, '-w', 'LineWidth', 2)
+hold off
+xlabel("t, days")
+ylabel("X, meters")
+colormap(jet); 
+caxis([-12 3])
+hcb = colorbar;
+hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
 
-plot(t, s(1:2, :))
+figure
+plot(t/3600/24, s(2, :))
+xlabel("time, days")
+ylabel("s1, meters")
 
 m = (s(2, :) - s(1, :))*pc.rho1 + ...
     (s(3, :) - s(2, :))*pc.rho2 + ...

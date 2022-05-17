@@ -19,7 +19,7 @@ tau = 3600*24*365.25/365.25;        % Шаг по времени, с
 tauSave = 3600*24*365.25;
 
 %%% Начальные условия
-s = [0; 7; 79; 80];
+s = [0; 7; 80; 80];
 x2 = linspace(s(2), s(3), Np(2));
 u2 = -1*ones(1, length(x2)) + 273.15;
 accumRate = 0;
@@ -86,15 +86,14 @@ function [tNew, sNew] = reduceNumOfPointsInS(t, s, newN)
                 ( abs(ds1(i-1)) > 0 && abs(ds1(i)) < 1e-6 ) || ...
                 ( abs(ds3(i-1)) < 1e-6 && abs(ds3(i)) > 0 ) || ...
                 ( abs(ds3(i-1)) > 0  && abs(ds3(i)) < 1e-6 )
-            idPhase( k:min(k+2*nPointsPerEvent_halved, N) ) = max(i-nPointsPerEvent_halved, 1):min(i+nPointsPerEvent_halved, N);
-            k = k + nPointsPerEvent_halved*2+1;
+            idI = max(i-nPointsPerEvent_halved, 1):min(i+nPointsPerEvent_halved, N);
+            idPhase( k:k+length(idI)-1 ) = idI;
+            k = k + length(idI);
         end
     end
     idPhase(k:end) = [];
     
-    idH = 1:ceil(N/newN):N;
-    
-    id = unique([ 1, idPhase, idH, N ]);
+    id = unique([ 1, idPhase, 1:ceil(N/newN):N, N ]);
     tNew = t(id);
     sNew = s(:, id);
 end
