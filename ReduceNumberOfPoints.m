@@ -15,7 +15,7 @@ bc.g1 = @(t)(-4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание
 %%% Параметры численного решения
 Np = [500 5000 500];            % Число узлов сетки для каждой фазы
 tMax = 4*365.25*24*3600;        % Время, до которого необходимо моделировать, с
-tau = 3600*24*365.25/12;        % Шаг по времени, с
+tau = 3600*24*365.25/365.25;        % Шаг по времени, с
 tauSave = 3600*24*365.25;
 
 %%% Начальные условия
@@ -40,20 +40,26 @@ ic = struct('s', s, ...
                                               'gridType', 'SigmoidBased', ...
                                               'NpSave', [100 1000 100], ...
                                               'accumRate', accumRate);
-
+                                        
 subplot(2, 2, 1)
 setupPlot( plot(t, s(3:4, :), '--o') );
 title( sprintf("Before, N = %d", length(t)) )
 subplot(2, 2, 3)
 setupPlot( plot(t, s(2, :), '--o') );
 
-[t, s] = reduceNumOfPointsInS(t, s, 0.1);
-
+[tSp, sSp] = reduceNumOfPointsInS(t, s, 100);
 subplot(2, 2, 2)
-setupPlot( plot(t, s(3:4, :), '--o') );
-title( sprintf("After, N = %d", length(t)) )
+setupPlot( plot(tSp, sSp(3:4, :), '--o') );
+title( sprintf("After, N = %d", length(tSp)) )
 subplot(2, 2, 4)
-setupPlot( plot(t, s(2, :), '--o') );
+setupPlot( plot(tSp, sSp(2, :), '--o') );
+
+f = @() reduceNumOfPointsInS(t, s, 100);
+time = timeit(f, 2);
+fprintf("Original number of points: %d\n", length(t));
+fprintf("     New number of points: %d\n", length(tSp));
+fprintf("                    Ratio: %.2f\n", length(t)/length(tSp));
+fprintf("       Time for reduction: %.2e sec\n", time)
 
 function setupPlot(plotObj)
     ax = plotObj.Parent;
@@ -65,8 +71,10 @@ function setupPlot(plotObj)
     end
 end
 
-function [tNew, sNew] = reduceNumOfPointsInS(t, s, h)
+function [tNew, sNew] = reduceNumOfPointsInS(t, s, newN)
     N = length(t);
+    nPointsPerEvent_halved = 3; % Сколько точек выделить слева и справа на 
+                                %   событие зарождения или исчезновения фазы
 
     % Поиск индексов, где происходит создание или вырождение фазы
     ds1 = s(2, :) - s(1, :);
@@ -78,28 +86,15 @@ function [tNew, sNew] = reduceNumOfPointsInS(t, s, h)
                 ( abs(ds1(i-1)) > 0 && abs(ds1(i)) < 1e-6 ) || ...
                 ( abs(ds3(i-1)) < 1e-6 && abs(ds3(i)) > 0 ) || ...
                 ( abs(ds3(i-1)) > 0  && abs(ds3(i)) < 1e-6 )
-            idPhase(k) = i-1;
-            k = k + 1;
+            idPhase( k:min(k+2*nPointsPerEvent_halved, N) ) = max(i-nPointsPerEvent_halved, 1):min(i+nPointsPerEvent_halved, N);
+            k = k + nPointsPerEvent_halved*2+1;
         end
     end
     idPhase(k:end) = [];
     
-    % Разрежение данных с новым шагом h
-    idH = zeros(1, N);
-    k = 1;
-    i1 = 1;
-    for i = 2:N 
-        ds = s(:, i) - s(:, i1);
-        if max(abs(ds)) >= h
-            idH(k) = i;
-            k = k + 1;
-            i1 = i;
-        end
-    end
-    idH(k:end) = [];
+    idH = 1:ceil(N/newN):N;
     
-    %id = unique([ 1, idPhase, idH, N ]);
-    id = unique( [1, N, idPhase, 2:10:N-1] );
+    id = unique([ 1, idPhase, idH, N ]);
     tNew = t(id);
     sNew = s(:, id);
 end
