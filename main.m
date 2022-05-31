@@ -1,3 +1,8 @@
+% Скрипт для запуска численного решения трёхфазной задачи Стефана.
+% Приведен пример задачи физических констант, граничных и начальных
+% условий, визуализации результатов. Визуализация может занимать время
+% порядка десятков секунд, даже если скрипт уже закончил работу.
+
 clear; close all;
 
 %%% Физические константы
@@ -14,17 +19,17 @@ bc.g1 = @(t)(-4.3 + 8*sin(2*pi*t/31556952 + pi/2) + 273.15); %% Внимание
 
 %%% Параметры численного решения
 Np = [500 5000 500];            % Число узлов сетки для каждой фазы
-tMax = 4*365.25*24*3600;        % Время, до которого необходимо моделировать, с
+tMax = 10*365.25*24*3600;        % Время, до которого необходимо моделировать, с
 tau = 3600*24*365.25/365.25;        % Шаг по времени, с
 tauSave = 3600*24*365.25/24;
-NpBoundsSave = 100;
+NpBoundsSave = inf;
 
 %%% Начальные условия
-s = [0; 7; 79; 80];
+s = [0; 7; 78; 80];
 x2 = linspace(s(2), s(3), Np(2));
-% u2 = -1*ones(1, length(x2)) + 273.15;
-Uf_adj = 273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) );
-u2 = linspace(Uf_adj, pc.Uf, Np(2));  
+u2 = -1*ones(1, length(x2)) + 273.15;
+% Uf_adj = 273.15 - 7.43*1e-8*pc.rho2*9.81*( s(3) - s(2) );
+% u2 = linspace(Uf_adj, pc.Uf, Np(2));  
 accumRate = 0;
 ic = struct('s', s, ...
             'dsdt', zeros(4, 1), ...
@@ -72,6 +77,11 @@ ic = struct('s', s, ...
 %             'u3', 273.15 + 0*ones(Np(3), 1), ...
 %             'tInit', 0);
         
+% Если нет скомпилированного mex-файла, скомпилировать
+if ~(isfile("mex_TDMA.mexw64") || isfile("mex_TDMA.mexa64"))
+    mex -largeArrayDims mex_TDMA.cpp
+end
+
 [s, t, U, X, T] = StefanProblemSolver(pc, bc, ic, 'tau', tau, ...
                                                   'tauSave', tauSave, ...
                                                 'tMax', tMax, ...
@@ -81,37 +91,40 @@ ic = struct('s', s, ...
                                                 'accumRate', accumRate, ...
                                                 'NpBoundsSave', NpBoundsSave);
  
-% figure
-% plot(X(:, 1), U(:, 1) - 273.15)
-% hold on; plot(X(:, end-1), U(:, end-1) - 273.15); hold off
-% xlabel("X, meters");
-% ylabel("T, C");
-% lg = legend("u2 init", "u2 end"); lg.Location = 'best';
-% 
-% figure
-% %subplot(5, 1, [2 5]);
-% contourf(repmat(T, length(X(:, 1)), 1)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, 'LineColor', 'none', 'LevelStep', 0.5);
-% axis([-inf inf s(1, 1) max(s(4, :))])
-% hold on
-% plot(t/3600/24, s, '-w', 'LineWidth', 2)
-% hold off
-% xlabel("t, days")
-% ylabel("X, meters")
-% colormap(jet); 
-% caxis([-12 3])
-% hcb = colorbar;
-% hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
+%%% Построение графиков
+% Общая диаграмма с температурами и границами фаз
+figure
+subplot(5, 1, 1)
+plot(t/3600/24, bc.g1(t) - 273.15)
+ylabel("T, C")
+axis([-inf inf -inf inf])
+subplot(5, 1, [2 5]);
+contourf(repmat(T, length(X(:, 1)), 1)/3600/24, X(:, 1:end), U(:, 1:end) - 273.15, ...
+    'LineColor', 'none', 'LevelStep', 0.5);
+axis([-inf inf s(1, 1) max(s(4, :))])
+hold on
+plot(t/3600/24, s, '-w', 'LineWidth', 2)
+hold off
+xlabel("t, days")
+ylabel("X, meters")
+colormap(jet); 
+caxis([-12 3])
+%hcb = colorbar;
+%hcb.Title.String = "T, C"; hcb.Title.Interpreter = 'latex'; hcb.TickLabelInterpreter = 'latex';
 
+% Закон движения нижней кромки ледника
 figure
 plot(t/3600/24, s(2, :))
 xlabel("time, days")
 ylabel("s1, meters")
 
+% Закон движения верхней кромки ледника и поверхности надледниковой воды
 figure
 plot(t/3600/24, s(3:4, :))
 xlabel("time, days")
 ylabel("s, meters")
 
+% Изменение массы с поправкой на аккумуляцию
 m = (s(2, :) - s(1, :))*pc.rho1 + ...
     (s(3, :) - s(2, :))*pc.rho2 + ...
     (s(4, :) - s(3, :))*pc.rho1 - accumRate/(365.25*24*3600)*t;
@@ -122,6 +135,11 @@ plot(t/3600/24, m)
 xlabel("t, days")
 ylabel("m, kg")
 
+function savePlot(h, filename)
+    savefig(h.Parent, filename);
+    print(h.Parent, filename, '-dpng', '-r300');
+    print(h.Parent, filename, '-depsc');
+end
 
 function pc = getPhysicalConstants(type)
     switch type
@@ -157,41 +175,4 @@ function pc = getPhysicalConstants(type)
                 type, "RealLife", "AllOnes"));
     end
     
-end
-
-function [tNew, sNew] = reduceNumOfPointsInS(t, s, h)
-    N = length(t);
-
-    % Поиск индексов, где происходит создание или вырождение фазы
-    ds1 = s(2, :) - s(1, :);
-    ds3 = s(4, :) - s(3, :);
-    idPhase = zeros(1, N);
-    k = 1;
-    for i = 2:N
-        if ( abs(ds1(i-1)) < 1e-6 && abs(ds1(i)) > 0 ) || ...
-                ( abs(ds1(i-1)) > 0 && abs(ds1(i)) < 1e-6 ) || ...
-                ( abs(ds3(i-1)) < 1e-6 && abs(ds3(i)) > 0 ) || ...
-                ( abs(ds3(i-1)) > 0  && abs(ds3(i)) < 1e-6 )
-            idPhase(k) = i-1;
-            k = k + 1;
-        end
-    end
-    idPhase(k:end) = [];
-    
-    % Разрежение данных с новым шагом h
-    idH = zeros(1, N);
-    k = 1;
-    for i = 2:N 
-        ds = s(:, i) - s(:, k);
-        if max(abs(ds)) >= h
-            idH(k) = i;
-            k = k + 1;
-        end
-    end
-    idH(k:end) = [];
-    
-    %id = unique([ 1, idPhase, idH, N ]);
-    id = unique( [1, N, idPhase, 2:10:N-1] );
-    tNew = t(id);
-    sNew = s(:, id);
 end
